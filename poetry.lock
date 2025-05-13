@@ -755,6 +755,23 @@ files = [
 ]
 
 [[package]]
+name = "pyfhel"
+version = "3.4.2"
+description = "Python for Homomorphic Encryption Libraries"
+optional = false
+python-versions = ">=3.7"
+groups = ["main"]
+files = [
+    {file = "Pyfhel-3.4.2.tar.gz", hash = "sha256:fa41664f8815b27f6347821f6363a7516fa84f50570816d8f292f2c22f88f88c"},
+]
+
+[package.dependencies]
+numpy = ">=1.21"
+
+[package.extras]
+test = ["coverage (>=6.4)", "pytest (>=6)", "pytest-cov (>=3.0)"]
+
+[[package]]
 name = "pygments"
 version = "2.19.1"
 description = "Pygments is a syntax highlighting package written in Python."
@@ -972,6 +989,27 @@ files = [
 cffi = {version = "*", markers = "implementation_name == \"pypy\""}
 
 [[package]]
+name = "rory"
+version = "0.0.196"
+description = "Core modules of Secure Rory"
+optional = false
+python-versions = ">=3.9,<4"
+groups = ["main"]
+files = [
+    {file = "rory-0.0.196-py3-none-any.whl", hash = "sha256:1cf1f6423b47222c4fac42402b0ac8570858c92304431cbefe791f9eee40c2db"},
+    {file = "rory-0.0.196.tar.gz", hash = "sha256:ef0c44e902ecaac198cc6c354b25d399f88485c770b01cc2cba1419a81293537"},
+]
+
+[package.dependencies]
+numpy = ">=1.21.0,<=2.2.5"
+pyfhel = ">=3.4.2,<4.0.0"
+
+[package.source]
+type = "legacy"
+url = "https://test.pypi.org/simple"
+reference = "testpypi"
+
+[[package]]
 name = "six"
 version = "1.17.0"
 description = "Python 2 and 3 compatibility utilities"
@@ -1123,4 +1161,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4"
-content-hash = "fefb3657ea19d2afc30c689a54ae06018f240fdb81fb0af251ac8ff3469079f0"
+content-hash = "3d72b5255ccb50f5d4bd81f6bb9223ec7537d51b521cd5dbdafffbcb4d085747"

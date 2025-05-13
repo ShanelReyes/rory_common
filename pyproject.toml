@@ -1,6 +1,6 @@
 [project]
 name = "rorycommon"
-version = "0.0.30"
+version = "0.0.37"
 description = ""
 authors = [
     {name = "Ignacio Castillo",email = "ignacio.bcastillo@gmail.com"}
@@ -9,9 +9,9 @@ readme = "README.md"
 requires-python = ">=3.10,<4"
 dependencies = [
     "pandas (>=2.2.3,<3.0.0)",
-    # "mictlanx @ https://test-files.pythonhosted.org/packages/d8/0c/1ccf0ab6ad66a4ef00555101affe8b7d3eaf824324c2cdf900ae59fb8a4c/mictlanx-0.0.161a18.tar.gz",
-    # "rory @ https://test-files.pythonhosted.org/packages/cc/0a/a4ada3014c7b76912d09d26e7ecb75742046bfd8d700d3a13888068e9694/rory-0.0.193.tar.gz",
-    "numpy (==2.2.5)"
+    "numpy (>=2.2.4)",
+    "pyfhel (>=3.4.2)",
+    "rory (==0.0.202)",
 ]
 
 [tool.poetry]
