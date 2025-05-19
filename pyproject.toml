@@ -1,6 +1,6 @@
 [project]
 name = "rorycommon"
-version = "0.0.37"
+version = "0.0.40"
 description = ""
 authors = [
     {name = "Ignacio Castillo",email = "ignacio.bcastillo@gmail.com"}
@@ -12,6 +12,7 @@ dependencies = [
     "numpy (>=2.2.4)",
     "pyfhel (>=3.4.2)",
     "rory (==0.0.202)",
+    "mictlanx (==0.0.161a30)",
 ]
 
 [tool.poetry]

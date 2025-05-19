@@ -19,6 +19,18 @@ from Pyfhel import PyCtxt
 import pickle
 from rory.core.security.cryptosystem.pqc.ckks import Ckks
 import hashlib as H
+from mictlanx.logger.log import Log
+
+DEBUG = bool(int(os.environ.get("RORY_COMMON_DEBUG","1")))
+
+L = Log(
+    name=__name__,
+    console_handler_filter= lambda r : DEBUG,
+    create_folder=False,
+    to_file= False
+)
+
+
 
 class Common:
     
@@ -400,14 +412,17 @@ class Common:
         condition = True
         put_res = None
         i = 0
-        while condition or i >= max_tries: 
+        while  i < max_tries: 
             _delete_result = await Common.while_not_delete_ball_id( STORAGE_CLIENT = client, bucket_id = bucket_id, key = key)
             put_res = await client.put(bucket_id = bucket_id, key = key, value = data, chunk_size = chunk_size, tags = tags, timeout = timeout)
             if put_res.is_ok:
                 return put_res
             condition = put_res.is_err and not (_delete_result == 0)
             if condition:
-                print(f"Put failed reytring in 1 second... Attemp {i}/{max_tries}")
+                L.error({
+                    "error":str(put_res.unwrap_err())
+                })
+                print(f"Put failed reytring in 1 second... Attemp {i+1}/{max_tries}")
                 await asyncio.sleep(1)
                 i+=1
         return put_res
@@ -426,21 +441,24 @@ class Common:
         condition = True
         put_res = None
         i = 0
-        while condition and i < max_tries: 
+        while  i < max_tries: 
             _delete_result = await Common.while_not_delete_ball_id(STORAGE_CLIENT = client, bucket_id = bucket_id, key = key)
             put_res = await client.put_chunks(bucket_id = bucket_id, key = key, chunks = chunks, tags = tags, timeout = timeout)
             if put_res.is_ok:
                 return put_res
             condition = put_res.is_err and not (_delete_result == 0)
             if condition:
-                print(f"Put failed reytring in 1 second... Attemp {i}/{max_tries}")
+                L.error({
+                    "error":str(put_res.unwrap_err())
+                })
+                print(f"Put failed reytring in 1 second... Attemp {i+1}/{max_tries}")
                 await asyncio.sleep(1)
                 i+=1
         return put_res
 
 
     @staticmethod
-    async def put_ndarray(client:AsyncClient,key:str,matrix:npt.NDArray,num_chunks:int =2,tags:Dict[str,str]={},bucket_id:str= "rory"):
+    async def put_ndarray(client:AsyncClient,key:str,matrix:npt.NDArray,timeout:int =300,max_retries:int=5,tags:Dict[str,str]={},bucket_id:str= "rory"):
         put_chunks_generator_results = await Common.delete_and_put_bytes(
             client    = client,
             bucket_id = bucket_id,
@@ -450,7 +468,9 @@ class Common:
                 "shape": str(matrix.shape),
                 "dtype": str(matrix.dtype),
                 **tags
-            }
+            },
+            timeout=timeout,
+            max_tries=max_retries
         )
         return put_chunks_generator_results
 
@@ -483,14 +503,16 @@ class Common:
     
 
     @staticmethod
-    async def put_chunks(client:AsyncClient,key:str,chunks:Chunks,tags:Dict[str,str]={},bucket_id:str= "rory"):
+    async def put_chunks(client:AsyncClient,key:str,chunks:Chunks,timeout:int=300,max_retries:int=5,tags:Dict[str,str]={},bucket_id:str= "rory"):
         chunks.sort()
         put_chunks_generator_results = await Common.delete_and_put_chunks(
             client    = client,
             bucket_id = bucket_id,
             key       = key,
             chunks    = chunks,
-            tags      = tags
+            tags      = tags,
+             timeout=timeout,
+             max_tries=max_retries
         )
         return put_chunks_generator_results
     
