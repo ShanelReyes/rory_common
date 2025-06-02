@@ -25,7 +25,7 @@ DEBUG = bool(int(os.environ.get("RORY_COMMON_DEBUG","1")))
 
 L = Log(
     name=__name__,
-    console_handler_filter= lambda r : DEBUG,
+    console_handler_filter = lambda r : DEBUG,
     create_folder=False,
     to_file= False
 )
@@ -389,11 +389,30 @@ class Common:
     async def while_not_delete_ball_id(STORAGE_CLIENT:AsyncClient ,bucket_id:str, key:str,timeout:int = 3600,max_tries:int = 5): 
         n_deletes = -1
         i = 0
-        while not ( n_deletes == 0 or i >= max_tries):
+        while (n_deletes ==-1 or n_deletes >0) and i <= max_tries:
             _delete_result = await STORAGE_CLIENT.delete(bucket_id=bucket_id,ball_id=key,timeout=timeout,force = True)
+            L.debug({
+                "event":"WHILE.NOT.DELETE.BALL_ID",
+                "bucket_id":bucket_id,
+                "ball_id":key,
+                "n_deletes":n_deletes,
+                "i":i, 
+                "max_tries":max_tries,
+                "ok":_delete_result.is_ok
+            })
             if _delete_result.is_ok:
                 del_response = _delete_result.unwrap()
                 n_deletes = del_response.n_deletes
+            else:
+                L.error({
+                    "error":str(_delete_result.unwrap_err()),
+                    "bucket_id":bucket_id,
+                    "ball_id":key,
+                    "i":i,
+                    "max_tries":max_tries,
+                    "n_deletes":n_deletes,
+
+                })
             i+=1
         return n_deletes
     
@@ -442,14 +461,17 @@ class Common:
         put_res = None
         i = 0
         while  i < max_tries: 
-            _delete_result = await Common.while_not_delete_ball_id(STORAGE_CLIENT = client, bucket_id = bucket_id, key = key)
+            _delete_result = await Common.while_not_delete_ball_id(STORAGE_CLIENT = client, bucket_id = bucket_id, key = key,timeout=timeout)
+
             put_res = await client.put_chunks(bucket_id = bucket_id, key = key, chunks = chunks, tags = tags, timeout = timeout)
+
             if put_res.is_ok:
                 return put_res
             condition = put_res.is_err and not (_delete_result == 0)
             if condition:
                 L.error({
-                    "error":str(put_res.unwrap_err())
+                    "error":str(put_res.unwrap_err()),
+                    "i":i
                 })
                 print(f"Put failed reytring in 1 second... Attemp {i+1}/{max_tries}")
                 await asyncio.sleep(1)
