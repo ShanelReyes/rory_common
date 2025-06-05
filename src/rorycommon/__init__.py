@@ -391,18 +391,31 @@ class Common:
         i = 0
         while (n_deletes ==-1 or n_deletes >0) and i <= max_tries:
             _delete_result = await STORAGE_CLIENT.delete(bucket_id=bucket_id,ball_id=key,timeout=timeout,force = True)
-            L.debug({
-                "event":"WHILE.NOT.DELETE.BALL_ID",
-                "bucket_id":bucket_id,
-                "ball_id":key,
-                "n_deletes":n_deletes,
-                "i":i, 
-                "max_tries":max_tries,
-                "ok":_delete_result.is_ok
-            })
+            
+            # L.debug({
+            #     "event":"WHILE.NOT.DELETE.BALL_ID",
+            #     "bucket_id":bucket_id,
+            #     "ball_id":key,
+            #     "n_deletes":n_deletes,
+            #     "i":i, 
+            #     "max_tries":max_tries,
+            #     "ok":_delete_result.is_ok
+            # })
+
             if _delete_result.is_ok:
                 del_response = _delete_result.unwrap()
                 n_deletes = del_response.n_deletes
+                L.debug({
+                    "event":"WHILE.NOT.DELETE.BALL_ID.SUCCESS",
+                    "bucket_id":bucket_id,
+                    "ball_id":key,
+                    "n_deletes":n_deletes,
+                    "i":i, 
+                    "max_tries":max_tries,
+                    "ok":_delete_result.is_ok
+                 })
+                if n_deletes == 0:
+                    return n_deletes
             else:
                 L.error({
                     "error":str(_delete_result.unwrap_err()),
@@ -464,10 +477,19 @@ class Common:
             _delete_result = await Common.while_not_delete_ball_id(STORAGE_CLIENT = client, bucket_id = bucket_id, key = key,timeout=timeout)
 
             put_res = await client.put_chunks(bucket_id = bucket_id, key = key, chunks = chunks, tags = tags, timeout = timeout)
-
+            L.debug({
+                "event":"DELETE.COMPLETED",
+                "bucket_id":bucket_id,
+                "key":key,
+                "n_deletes":_delete_result,
+                "put_ok": put_res.is_ok
+            })
             if put_res.is_ok:
                 return put_res
+            
+            # condition = put_res.is_err or _delete_result >0
             condition = put_res.is_err and not (_delete_result == 0)
+            # and not (_delete_result == 0)
             if condition:
                 L.error({
                     "error":str(put_res.unwrap_err()),
@@ -476,6 +498,14 @@ class Common:
                 print(f"Put failed reytring in 1 second... Attemp {i+1}/{max_tries}")
                 await asyncio.sleep(1)
                 i+=1
+        L.debug(
+            {
+                "event":"DELETE.PUT.CHUNKS",
+                "bucket_id":bucket_id,
+                "key":key,
+                "ok":put_res.is_ok
+            }
+        )
         return put_res
 
 
