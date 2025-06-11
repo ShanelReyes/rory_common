@@ -66,6 +66,7 @@ class Common:
                 inner_sctxts.append(ctxt.to_bytes())
             serialized_ciphertexts.append(inner_sctxts)
         return pickle.dumps(serialized_ciphertexts)
+    
     def from_bytes_to_pyctxt_matrix(ckks:Ckks,x:bytes):
         yss = pickle.loads(x)
         scheme = ckks.he_object
