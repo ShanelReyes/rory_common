@@ -639,7 +639,7 @@ class Common:
                     delay             = delay,
                     backoff_factor    = backoff_factor,
                     force             = force,
-                    max_paralell_gets = max_paralell_gets,
+                    max_parallel_gets = max_paralell_gets,
                     chunk_size        = chunk_size,
                     headers           = headers,
                     http2             = http2
@@ -698,7 +698,7 @@ class Common:
             max_retries       = max_retries,
             delay             = delay,
             backoff_factor    = backoff_factor,
-            max_paralell_gets = max_paralell_gets,
+            max_parallel_gets=  max_paralell_gets,
             force             = force,
             timeout           = timeout, 
             chunk_size        = chunk_size,
@@ -748,7 +748,7 @@ class Common:
             headers           = headers,
             max_retries       = max_retries,
             http2             = http2,
-            max_paralell_gets = max_paralell_gets
+            max_parallel_gets = max_paralell_gets
         )
         xs = []
         async for (m,c) in res:
