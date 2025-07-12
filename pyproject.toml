@@ -1,28 +1,36 @@
 [project]
 name = "rorycommon"
-version = "0.0.58"
+version = "0.0.60"
 description = ""
 authors = [
     {name = "Ignacio Castillo",email = "ignacio.bcastillo@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.10,<4"
-dependencies = [
-    "pandas (>=2.2.3,<3.0.0)",
-    "numpy (>=2.2.4)",
-    "pyfhel (>=3.4.2)",
-    "rory (==0.0.212)",
-    "mictlanx (==0.0.161a35)",
-]
+requires-python = ">=3.11,<4"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+pandas = ">=2.2.3,<3.0.0"
+numpy = ">=2.2.4"
+rory = {version = "0.0.212", source ="testpypi"}
+pytest = ">=8.4.1,<9.0.0"
+pyfhel = { git = "https://github.com/ibarrond/Pyfhel.git", branch = "dev" }
+mictlanx = {url = "https://test-files.pythonhosted.org/packages/d4/bc/5937bf8cadfd011978c24f57e76b401ca5c2e914bbb3e5dee2a2cda16479/mictlanx-0.0.161a37.tar.gz"}
+
+
+
 
 [tool.poetry]
 packages = [{include = "rorycommon", from = "src"}]
 
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.3.5"
 pytest-asyncio = "^0.25.3"
 ipykernel = "^6.29.5"
+pytest = "^8.4.1"
+seaborn = "^0.13.2"
+scikit-learn = "^1.7.0"
+
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

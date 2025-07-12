@@ -1,59 +1,53 @@
 import numpy as np
-from typing import Tuple,Iterator
+from typing import Tuple,Iterator,Optional
+from mictlanx.utils.segmentation import Chunk
+from option import Some
+import hashlib as H
 # import zarr 
 
 class Utils:
     @staticmethod
-    def read_chunks_numpy(filename: str, chunk_shape: Tuple[int, ...]) -> Iterator[np.ndarray]:
+    def read_chunks_numpy(filename: str,ball_id:str, row_chunk:int =10, max_columns:Optional[int]=None) -> Iterator[Chunk]:
         """
-        Lazily reads chunks from a .npy file using numpy.memmap.
+        Reads a .npy file chunk by chunk, with optional max number of columns.
         
         Parameters:
-        - filename: path to the .npy file.
-        - chunk_shape: shape of the chunk to return (e.g., (1000, 10)).
+        - filename: path to .npy file
+        - row_chunk: number of rows per chunk
+        - max_columns: optional max number of columns per chunk (e.g. 100)
         
         Yields:
-        - chunks of the array with shape <= chunk_shape.
+        - 2D NumPy arrays of shape (<=row_chunk, <=max_columns)
         """
-        print("AAA")
         mmap_array = np.load(filename, mmap_mode='r')
-        full_shape = mmap_array.shape
-        ndim = mmap_array.ndim
-        print(full_shape,ndim)
+        total_rows, total_cols = mmap_array.shape
+        num_chunks = 0
+        # (total_rows + row_chunk - 1) // row_chunk
 
-        # Determine number of steps for each dimension
-        steps = [range(0, full_shape[i], chunk_shape[i]) for i in range(ndim)]
+        cols_to_read = min(total_cols, max_columns) if max_columns else total_cols
+        h = H.sha256()
+        for i in range(0, total_rows, row_chunk):
+            chunk_data = mmap_array[i:i + row_chunk, 0:cols_to_read]
+            h.update(chunk_data.tobytes())
+            num_chunks +=1
+            
+        full_checksum = h.hexdigest()
 
-        # Iterate over all chunks using nested loops
-        from itertools import product
-        for start_indices in product(*steps):
-            slices = tuple(
-                slice(start, min(start + chunk_shape[i], full_shape[i]))
-                for i, start in enumerate(start_indices)
+        chunk_index =0
+        for i in range(0, total_rows, row_chunk):
+            x = mmap_array[i:i + row_chunk, 0:cols_to_read]
+            
+            chunk_id = f"{ball_id}_{chunk_index}"
+            c = Chunk.from_ndarray(
+                ndarray  = x,
+                group_id = ball_id,
+                index    = chunk_index,
+                chunk_id = Some(chunk_id),
+                metadata={
+                    "full_shape":str((total_rows,total_cols)), 
+                    "full_checksum":full_checksum,
+                    "num_chunks":str(num_chunks)
+                }
             )
-            yield mmap_array[slices]
-    # @staticmethod
-    # def read_chunks_zarr(store_path: str, chunk_shape: Tuple[int, ...]) -> Iterator[np.ndarray]:
-    #     """
-    #     Lazily reads chunks from a .zarr array given a chunk shape.
-        
-    #     Parameters:
-    #     - store_path: path to the Zarr store (directory or zip).
-    #     - chunk_shape: shape of the chunks to yield.
-        
-    #     Yields:
-    #     - chunks of the array with shape <= chunk_shape.
-    #     """
-    #     z = zarr.open(store_path, mode='r')
-    #     full_shape = z.shape
-    #     ndim = z.ndim
-
-    #     steps = [range(0, full_shape[i], chunk_shape[i]) for i in range(ndim)]
-
-    #     from itertools import product
-    #     for start_indices in product(*steps):
-    #         slices = tuple(
-    #             slice(start, min(start + chunk_shape[i], full_shape[i]))
-    #             for i, start in enumerate(start_indices)
-    #         )
-    #         yield z[slices]
+            yield c
+            chunk_index+=1

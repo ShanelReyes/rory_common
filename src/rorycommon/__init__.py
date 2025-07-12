@@ -1,7 +1,7 @@
 import time as T
 import asyncio
 from mictlanx import AsyncClient
-# from mictlanx.v4.interfaces.responses import PutChunkedResponse,AsyncGetResponse
+from rorycommon.utils import Utils as RoryCommonUtils
 import mictlanx.interfaces as InterfaceX
 from option import Option, NONE,Result,Ok,Err,Some
 from functools import reduce
@@ -9,7 +9,7 @@ import numpy as np
 import numpy.typing as npt
 import pandas as pd
 import os
-from typing import Tuple, Generator,Dict
+from typing import Tuple, Generator,Dict,AsyncGenerator
 from mictlanx.utils.segmentation import Chunks,Chunk
 from rory.core.security.dataowner import DataOwner
 from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
@@ -34,6 +34,29 @@ L = Log(
 
 class Common:
     
+    @staticmethod
+    async def segment_and_put_lazy(
+        client:AsyncClient,bucket_id:str,ball_id:str,
+        path:str,row_chunk_size:int =100,max_attemtps:int = 10,
+        timeout:int=120,max_backoff:int =5,tags:Dict[str,str]={})->AsyncGenerator[InterfaceX.PutChunkedResponse, None]:
+        # chunks_generator = RoryCommonUtils.read_chunks_numpy(ball_id=ball_id,filename="/rory/source/auditdatadata.npy",row_chunk=10)
+        chunks_generator = RoryCommonUtils.read_chunks_numpy(ball_id=ball_id,filename=path,row_chunk=row_chunk_size)
+        for c in chunks_generator:
+            res = await Common.delete_and_put_chunk(
+
+                client    = client,
+                bucket_id = bucket_id,
+                ball_id    = ball_id,
+                chunk      = c,
+                tags      = {**c.metadata,**tags},
+                max_tries = max_attemtps,
+                timeout   = timeout,
+                max_backoff=max_backoff 
+            )
+            if res.is_err:
+                raise Exception(f"Failed to put a chunk: {c.chunk_id}")
+            yield res.unwrap()
+
     @staticmethod
     async def read_numpy_from(path:str="",extension:str="")->Result[npt.NDArray,Exception]:
         try:
@@ -384,7 +407,39 @@ class Common:
                 tmp_row.append(element)
             matrix.append(tmp_row)
         return matrix
+    @staticmethod
+    async def while_not_delete_key(STORAGE_CLIENT:AsyncClient ,bucket_id:str, key:str,timeout:int = 3600,max_tries:int = 5): 
+        n_deletes = -1
+        i = 0
+        while (n_deletes ==-1 or n_deletes >0) and i <= max_tries:
+            _delete_result = await STORAGE_CLIENT.delete_by_key(bucket_id=bucket_id,key=key,timeout=timeout,force = True)
 
+            if _delete_result.is_ok:
+                del_response = _delete_result.unwrap()
+                n_deletes = del_response.n_deletes
+                L.debug({
+                    "event":"WHILE.NOT.DELETE.KEY.SUCCESS",
+                    "bucket_id":bucket_id,
+                    "ball_id":key,
+                    "n_deletes":n_deletes,
+                    "i":i, 
+                    "max_tries":max_tries,
+                    "ok":_delete_result.is_ok
+                 })
+                if n_deletes == 0:
+                    return n_deletes
+            else:
+                L.error({
+                    "error":str(_delete_result.unwrap_err()),
+                    "bucket_id":bucket_id,
+                    "ball_id":key,
+                    "i":i,
+                    "max_tries":max_tries,
+                    "n_deletes":n_deletes,
+
+                })
+            i+=1
+        return n_deletes
 
     @staticmethod
     async def while_not_delete_ball_id(STORAGE_CLIENT:AsyncClient ,bucket_id:str, key:str,timeout:int = 3600,max_tries:int = 5): 
@@ -392,16 +447,6 @@ class Common:
         i = 0
         while (n_deletes ==-1 or n_deletes >0) and i <= max_tries:
             _delete_result = await STORAGE_CLIENT.delete(bucket_id=bucket_id,ball_id=key,timeout=timeout,force = True)
-            
-            # L.debug({
-            #     "event":"WHILE.NOT.DELETE.BALL_ID",
-            #     "bucket_id":bucket_id,
-            #     "ball_id":key,
-            #     "n_deletes":n_deletes,
-            #     "i":i, 
-            #     "max_tries":max_tries,
-            #     "ok":_delete_result.is_ok
-            # })
 
             if _delete_result.is_ok:
                 del_response = _delete_result.unwrap()
@@ -446,7 +491,7 @@ class Common:
         put_res = None
         i = 0
         while  i < max_tries: 
-            _delete_result = await Common.while_not_delete_ball_id( STORAGE_CLIENT = client, bucket_id = bucket_id, key = key)
+            _delete_result = await Common.while_not_delete_ball_id( STORAGE_CLIENT = client, bucket_id = bucket_id, key = key,max_tries=max_tries)
             put_res = await client.put(bucket_id = bucket_id, key = key, value = data, chunk_size = chunk_size, tags = tags, timeout = timeout)
             if put_res.is_ok:
                 return put_res
@@ -457,16 +502,71 @@ class Common:
                 })
                 print(f"Put failed reytring in 1 second... Attemp {i+1}/{max_tries}")
                 await asyncio.sleep(1)
-                i+=1
+            i+=1
         return put_res
-    
+   
+    @staticmethod
+    async def delete_and_put_chunk(
+        client:AsyncClient,
+        bucket_id:str,
+        ball_id:str,
+        chunk:Chunk, 
+        tags:Dict[str,str]={},
+        timeout:int = 3600,
+        max_tries:int =5,
+        max_backoff:int =5
+    )->Result[InterfaceX.PutChunkedResponse,Exception]:
+        condition = True
+        put_res = None
+        i = 0
+        while  i < max_tries: 
+            _delete_result = await Common.while_not_delete_key(STORAGE_CLIENT = client, bucket_id = bucket_id, key = chunk.chunk_id,timeout=timeout,max_tries=max_tries)
+            put_res = await client.put_single_chunk(
+                bucket_id = bucket_id, 
+                ball_id = ball_id,
+                chunk=chunk, 
+                tags = tags, 
+                timeout = timeout,
+                max_tries=max_tries,
+                max_backoff=max_backoff
+            )
+            L.debug({
+                "event":"DELETE.COMPLETED",
+                "bucket_id":bucket_id,
+                "key":ball_id,
+                "n_deletes":_delete_result,
+                "put_ok": put_res.is_ok
+            })
+            if put_res.is_ok:
+                return put_res
+            
+            # condition = put_res.is_err or _delete_result >0
+            condition = put_res.is_err and not (_delete_result == 0)
+            # and not (_delete_result == 0)
+            if condition:
+                L.error({
+                    "error":str(put_res.unwrap_err()),
+                    "i":i
+                })
+                print(f"Put failed reytring in 1 second... Attemp {i+1}/{max_tries}")
+                await asyncio.sleep(1)
+            i+=1
+        L.debug(
+            {
+                "event":"DELETE.PUT.CHUNKS",
+                "bucket_id":bucket_id,
+                "key":ball_id,
+                "ok":put_res.is_ok
+            }
+        )
+        return put_res
 
     @staticmethod
     async def delete_and_put_chunks(
         client:AsyncClient,
         bucket_id:str,
         key:str,
-        chunks:Chunks, 
+        chunks:Chunk, 
         tags:Dict[str,str]={},
         timeout:int = 3600,
         max_tries:int =5
@@ -475,9 +575,9 @@ class Common:
         put_res = None
         i = 0
         while  i < max_tries: 
-            _delete_result = await Common.while_not_delete_ball_id(STORAGE_CLIENT = client, bucket_id = bucket_id, key = key,timeout=timeout)
+            _delete_result = await Common.while_not_delete_ball_id(STORAGE_CLIENT = client, bucket_id = bucket_id, key = key,timeout=timeout,max_tries=max_tries)
 
-            put_res = await client.put_chunks(bucket_id = bucket_id, key = key, chunks = chunks, tags = tags, timeout = timeout)
+            put_res = await client.put_single_chunk(bucket_id = bucket_id, key = key, chunks = chunks, tags = tags, timeout = timeout)
             L.debug({
                 "event":"DELETE.COMPLETED",
                 "bucket_id":bucket_id,
@@ -498,7 +598,7 @@ class Common:
                 })
                 print(f"Put failed reytring in 1 second... Attemp {i+1}/{max_tries}")
                 await asyncio.sleep(1)
-                i+=1
+            i+=1
         L.debug(
             {
                 "event":"DELETE.PUT.CHUNKS",
@@ -675,7 +775,47 @@ class Common:
         except Exception as e:
             raise e
         
-    
+
+  
+    @staticmethod
+    async def iterate_matrix_chunks(
+        client:AsyncClient,
+        ball_id:str,
+        bucket_id:str="rory",
+        max_retries:int = 5,
+        delay:float = 1,
+        backoff_factor:float =.5,
+        max_paralell_gets:int = 10, 
+        force:bool = False,
+        timeout:int = 120,
+        chunk_size:str="256kb",
+        headers:Dict[str,str] ={},
+        http2:bool = False
+        ):
+
+            x_result = client.get_chunks(
+                bucket_id         = bucket_id,
+                key               = ball_id,
+                timeout           = timeout,
+                max_retries       = max_retries,
+                delay             = delay,
+                backoff_factor    = backoff_factor,
+                force             = force,
+                max_parallel_gets = max_paralell_gets,
+                chunk_size        = chunk_size,
+                headers           = headers,
+                http2             = http2
+            )
+            async for (m,data) in x_result:
+                shape = eval(m.tags.get("shape"))
+                dtype = m.tags.get("dtype","float64")
+                index = int(m.tags.get("index","-1"))
+                # print(shape,dtype,index)
+                yield index,np.frombuffer(data.tobytes(),dtype=dtype).reshape(shape)
+
+
+
+
     @staticmethod
     async def get_pyctxt(
             client:AsyncClient,
