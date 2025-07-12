@@ -39,7 +39,6 @@ class Common:
         client:AsyncClient,bucket_id:str,ball_id:str,
         path:str,row_chunk_size:int =100,max_attemtps:int = 10,
         timeout:int=120,max_backoff:int =5,tags:Dict[str,str]={})->AsyncGenerator[InterfaceX.PutChunkedResponse, None]:
-        # chunks_generator = RoryCommonUtils.read_chunks_numpy(ball_id=ball_id,filename="/rory/source/auditdatadata.npy",row_chunk=10)
         chunks_generator = RoryCommonUtils.read_chunks_numpy(ball_id=ball_id,filename=path,row_chunk=row_chunk_size)
         for c in chunks_generator:
             res = await Common.delete_and_put_chunk(
@@ -503,6 +502,7 @@ class Common:
                 print(f"Put failed reytring in 1 second... Attemp {i+1}/{max_tries}")
                 await asyncio.sleep(1)
             i+=1
+            i+=1
         return put_res
    
     @staticmethod
@@ -598,6 +598,7 @@ class Common:
                 })
                 print(f"Put failed reytring in 1 second... Attemp {i+1}/{max_tries}")
                 await asyncio.sleep(1)
+            i+=1
             i+=1
         L.debug(
             {
