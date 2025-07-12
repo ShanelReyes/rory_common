@@ -457,7 +457,7 @@ class Common:
                 })
                 print(f"Put failed reytring in 1 second... Attemp {i+1}/{max_tries}")
                 await asyncio.sleep(1)
-                i+=1
+            i+=1
         return put_res
     
 
@@ -498,7 +498,7 @@ class Common:
                 })
                 print(f"Put failed reytring in 1 second... Attemp {i+1}/{max_tries}")
                 await asyncio.sleep(1)
-                i+=1
+            i+=1
         L.debug(
             {
                 "event":"DELETE.PUT.CHUNKS",
