@@ -15,7 +15,7 @@ class Utils:
         Yields:
         - chunks of the array with shape <= chunk_shape.
         """
-        print("AAA")
+        # print("AAA")
         mmap_array = np.load(filename, mmap_mode='r')
         full_shape = mmap_array.shape
         ndim = mmap_array.ndim

@@ -13,6 +13,7 @@ from typing import Tuple, Generator,Dict
 from mictlanx.utils.segmentation import Chunks,Chunk
 from rory.core.security.dataowner import DataOwner
 from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
+from rory.core.security.cryptosystem.paillier import Paillier
 from typing import List,Awaitable
 from concurrent.futures import ProcessPoolExecutor
 from Pyfhel import PyCtxt
@@ -756,3 +757,19 @@ class Common:
             xs.append(x)
         res = np.vstack(xs)
         return res
+    
+
+    @staticmethod
+    def segment_and_encrypt_paillier_with_executor(executor:ProcessPoolExecutor,key:str,dataowner:DataOwner,plaintext_matrix:npt.NDArray, n:int, np_random:bool, num_chunks:int=2 ):
+        plaintext_matrix_chunks:Chunks = Chunks.from_ndarray(ndarray= plaintext_matrix, group_id = key, num_chunks= num_chunks).unwrap()
+        awaitable_chunks:List[Awaitable[Chunk]] = []
+        for plaintext_matrix_chunk in plaintext_matrix_chunks.iter():
+            future = executor.submit(Common.encrypt_chunk_paillier,key = key, dataowner = dataowner,chunk = plaintext_matrix_chunk, np_random = np_random)
+            awaitable_chunks.append(future)
+        return Chunks(chs= Common.to_chunks_generator(awaitable_chunks=awaitable_chunks),n =n  )
+    
+    @staticmethod
+    def encrypt_chunk_paillier(key:str,dataowner:DataOwner,chunk:Chunk, np_random:bool)-> Chunk:
+        ptm = chunk.to_ndarray().unwrap()
+        encyrpted_chunk:npt.NDArray = dataowner.paillier_encrypt_matrix_chunk(plaintext_matrix = ptm, np_random=np_random)
+        return Chunk.from_ndarray(group_id=key, index= chunk.index, ndarray= encyrpted_chunk, chunk_id=Some("{}_{}".format(key,chunk.index)))
