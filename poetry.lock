@@ -1043,13 +1043,13 @@ traitlets = "*"
 
 [[package]]
 name = "mictlanx"
-version = "0.0.161a37"
+version = "0.0.161a39"
 description = "MictlanX Client - safely store your data and access them from any application"
 optional = false
 python-versions = ">=3.9,<4"
 groups = ["main"]
 files = [
-    {file = "mictlanx-0.0.161a37.tar.gz", hash = "sha256:d973439dd37398f10385f9df46b86b86f2cb4da0fde6df76f5984a864faedcc5"},
+    {file = "mictlanx-0.0.161a39.tar.gz", hash = "sha256:8aca6a4ce17d83df6e6520c01cc1b63663314cc801dd808b0b5f0d306c14b74d"},
 ]
 
 [package.dependencies]
@@ -1070,8 +1070,9 @@ xolo = ">=0.0.8a13"
 compression = ["lz4 (>=4.4.3,<5.0.0)"]
 
 [package.source]
-type = "url"
-url = "https://test-files.pythonhosted.org/packages/d4/bc/5937bf8cadfd011978c24f57e76b401ca5c2e914bbb3e5dee2a2cda16479/mictlanx-0.0.161a37.tar.gz"
+type = "legacy"
+url = "https://test.pypi.org/simple"
+reference = "testpypi"
 
 [[package]]
 name = "nanoid"
@@ -2448,4 +2449,4 @@ reference = "testpypi"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<4.0"
-content-hash = "eda07a3c8c2efb17872db0f9c3200b203bcf4091ccbb89400f0c38ccb14ed497"
+content-hash = "25ff0a7ab699d480964ba58455565143b3120bf38d1f183f04ce32f42aad4efa"

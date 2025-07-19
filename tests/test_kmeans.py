@@ -183,6 +183,7 @@ async def test_get_chunks():
 
 
 
+@pytest.mark.skip("")
 @pytest.mark.asyncio
 async def test_segment_and_put_lazy():
     bucket_id      = "rory"
@@ -192,6 +193,19 @@ async def test_segment_and_put_lazy():
     res = RoryCommon.segment_and_put_lazy(client= client, bucket_id=bucket_id, ball_id=ball_id, path= path, row_chunk_size= row_chunk_size)
     async for r in res:
         print(r)
+
+
+@pytest.mark.skip("")
+@pytest.mark.asyncio
+async def test_get_by_chunk():
+    res = await RoryCommon.get_matrix_chunk_or_error(
+        client= client,
+        bucket_id="rory",
+        ball_id="bx",
+        index = 2 
+    )
+    print(res)
+
 
 @pytest.mark.skip("")
 @pytest.mark.asyncio
@@ -209,11 +223,53 @@ async def test_lazy_encryption():
     ball_id              = "bx"
     chunks_generator = RoryCommonUtils.read_chunks_numpy(ball_id=ball_id,filename="/rory/source/X.npy",row_chunk=100)
     print(chunks_generator)
+    timeout =120
+    max_attempts  = 5
+    max_backoff = 5
+    bucket_id = "rory"
     for c in chunks_generator:
         maybe_ndarray = c.to_ndarray()
+        full_shape = eval(c.metadata.get("full_shape"))
+        num_chunks= int(c.metadata.get("num_chunks",0))
         if maybe_ndarray.is_some:
-            res = dataowner.liu_encrypt_matrix_chunk(maybe_ndarray.unwrap())
-            Chunk.from_ndarray(group_id=c.group_id, index=c.index,ndarray=res,metadata={}, chunk_id=Some(c.chunk_id))
-            print(res.shape)
+            res = await RoryCommon.encrypt_and_put_chunk(
+                client     = client,
+                bucket_id  = bucket_id,
+                ball_id    = ball_id,
+                index      = c.index,
+                dataowner  = dataowner,
+                ndarray    = maybe_ndarray.unwrap(),
+                full_shape = full_shape,
+                num_chunks = num_chunks
+            )
+            print(res)
+            # res = dataowner.liu_encrypt_matrix_chunk(maybe_ndarray.unwrap())
+            # m = res.shape[2]
+            # new_full_shape = (full_shape[0],full_shape[1], m)
+            # new_c = Chunk.from_ndarray(
+            #     group_id=c.group_id,
+            #     index=c.index,
+            #     ndarray=res,
+            #     metadata={
+            #         "full_shape":new_full_shape,
+            #         "dtype":str(res.dtype),
+            #         "shape":str(res.shape),
+            #         "num_chunks":str(c.metadata.get("num_chunks",0))
+            #     }, 
+            #     chunk_id=Some(c.chunk_id)
+            # )
+            # res_dp_chunk = await RoryCommon.delete_and_put_chunk(
+            #     client=client, 
+            #     bucket_id=bucket_id,
+            #     ball_id=c.group_id,
+            #     chunk=new_c,
+            #     tags ={},
+            #     max_backoff=max_backoff, 
+            #     max_tries=max_attempts,
+            #     timeout=timeout
+            # )
+            # if res_dp_chunk.is_err:
+            #     print("FAILED TO PUT", new_c.chunk_id)
+            # print(new_c,new_c.metadata)
         del maybe_ndarray
     # for c in 

@@ -33,11 +33,97 @@ L = Log(
 
 
 class Common:
-    
+    @staticmethod
+    async def encrypt_and_put_chunk(
+        client:AsyncClient,
+        bucket_id:str,
+        ball_id:str,
+        index:int,
+        dataowner: DataOwner,
+        ndarray:npt.NDArray,
+        full_shape:Tuple[int,int],
+        num_chunks:int,
+        max_backoff:int= 5, 
+        max_attempts:int = 10,
+        timeout:int=120
+    ):
+            res = dataowner.liu_encrypt_matrix_chunk(ndarray)
+            m = res.shape[2]
+            new_full_shape = (full_shape[0],full_shape[1], m)
+            new_c = Chunk.from_ndarray(
+                group_id=ball_id,
+                index=index,
+                ndarray=res,
+                metadata={
+                    "full_shape":str(new_full_shape),
+                    "dtype":str(res.dtype),
+                    "shape":str(res.shape),
+                    "num_chunks":str(num_chunks)
+                }, 
+                chunk_id=Some(f"{ball_id}_{index}")
+            )
+            res_dp_chunk = await Common.delete_and_put_chunk(
+                client=client, 
+                bucket_id=bucket_id,
+                ball_id=ball_id,
+                chunk=new_c,
+                tags ={},
+                max_backoff=max_backoff, 
+                max_tries=max_attempts,
+                timeout=timeout
+            )
+            if res_dp_chunk.is_err:
+                return res_dp_chunk
+            return res_dp_chunk
+                # print("FAILED TO PUT", new_c.chunk_id)
+    @staticmethod
+    async def get_by_chunk_index(
+        client:AsyncClient,
+        bucket_id:str,
+        ball_id:str,
+        index:int,
+        timeout:int =120,
+        max_attempts:int = 5,
+        delay:int =1,
+        backoff_factor:int =2,
+        # max_backoff:int=5,
+        force:bool =True,
+        max_parallel_gets:int =10, 
+        headers:Dict[str,str]= {}, 
+        chunk_size:str="256kb",
+        http2:bool = False,
+        max_backoff:int =3
+
+    ):
+        i =0
+        while i <= max_attempts :
+            x = await client.get_chunk(
+                bucket_id         = bucket_id,
+                ball_id           = ball_id,
+                index             = index,
+                max_parallel_gets = max_parallel_gets,
+                headers           = headers,
+                chunk_size        = chunk_size,
+                timeout           = timeout,
+                http2             = http2,
+                max_retries       = max_attempts,
+                delay             = delay,
+                backoff_factor    = backoff_factor,
+                force             = force, 
+                max_backoff       = max_backoff
+            )
+            if x.is_err:
+                e = x.unwrap_err()
+                print(f"Retrying in {delay} seconds... (Attemp {i}/{max_attempts})")
+                await asyncio.sleep(delay)
+                i+=1
+                continue
+            return x.unwrap()
+        
     @staticmethod
     async def segment_and_put_lazy(
         client:AsyncClient,bucket_id:str,ball_id:str,
-        path:str,row_chunk_size:int =100,max_attemtps:int = 10,
+        path:str,row_chunk_size:int =100,max_attempts:int = 10,
         timeout:int=120,max_backoff:int =5,tags:Dict[str,str]={})->AsyncGenerator[InterfaceX.PutChunkedResponse, None]:
         chunks_generator = RoryCommonUtils.read_chunks_numpy(ball_id=ball_id,filename=path,row_chunk=row_chunk_size)
         for c in chunks_generator:
@@ -48,7 +134,7 @@ class Common:
                 ball_id    = ball_id,
                 chunk      = c,
                 tags      = {**c.metadata,**tags},
-                max_tries = max_attemtps,
+                max_tries = max_attempts,
                 timeout   = timeout,
                 max_backoff=max_backoff 
             )
@@ -670,7 +756,57 @@ class Common:
         )
         return put_chunks_generator_results
     
-
+    @staticmethod
+    async def get_matrix_chunk_or_error(
+        client:AsyncClient,
+        ball_id:str, 
+        bucket_id:str,
+        index:int,
+        max_retries:int = 5,
+        delay:float = 1,
+        backoff_factor:float =.5,
+        max_paralell_gets:int = 10, 
+        force:bool = False,
+        timeout:int = 120,
+        chunk_size:str="256kb",
+        headers:Dict[str,str] ={},
+        http2:bool = False,
+        max_backoff:int = 5
+    )->Tuple[npt.NDArray,InterfaceX.Metadata]:
+        i =0
+        while i <= max_retries :
+            x = await client.get_chunk(
+                bucket_id         = bucket_id,
+                ball_id           = ball_id,
+                index             = index,
+                max_parallel_gets = max_paralell_gets,
+                headers           = headers,
+                chunk_size        = chunk_size,
+                timeout           = timeout,
+                http2             = http2,
+                max_retries       = max_retries,
+                delay             = delay,
+                backoff_factor    = backoff_factor,
+                force             = force, 
+                max_backoff       = max_backoff
+            )
+            if x.is_err:
+                e = x.unwrap_err()
+                print(f"Retrying in {delay} seconds... (Attemp {i}/{max_retries})")
+                await asyncio.sleep(delay)
+                i+=1
+                continue
+            (data,metadata) = x.unwrap()
+            maybe_ndarray = data.to_ndarray()
+            if maybe_ndarray.is_none:
+                raise Exception("Failed to convert chunk into a numpy array")
+            return (maybe_ndarray.unwrap(), metadata)
+            # dtype = metadata.tags.get("dtype","float32")
+            # raw_ndarray = np.frombuffer(buffer=data.to,dtype=dtype)
+            # shape = eval(metadata.tags.get("shape",str(raw_ndarray.shape)))
+            # return raw_ndarray.reshape(shape)
+        raise Exception(f"Get {bucket_id}@{ball_id} failed: Max tries reached")
+    
     @staticmethod
     async def get_matrix_or_error(
         client:AsyncClient,
@@ -684,7 +820,8 @@ class Common:
         timeout:int = 120,
         chunk_size:str="256kb",
         headers:Dict[str,str] ={},
-        http2:bool = False
+        http2:bool = False,
+        chunk_index:int = 0,
     )->npt.NDArray:
         i =0
         while i <= max_retries :
@@ -698,13 +835,14 @@ class Common:
                 force             = force, 
                 headers           = headers,
                 http2             = http2,
-                max_retries       = max_retries
+                max_retries       = max_retries,
+                chunk_index       = chunk_index
             )
             if x.is_err:
                 e = x.unwrap_err()
                 print(f"Retrying in {delay} seconds... (Attemp {i}/{max_retries})")
-                i+=i
                 await asyncio.sleep(delay)
+                i+=1
                 continue
             get_response = x.unwrap()
             dtype = get_response.metadatas[0].tags.get("dtype","float32")
@@ -727,8 +865,9 @@ class Common:
         timeout:int = 120,
         chunk_size:str="256kb",
         headers:Dict[str,str] ={},
-        http2:bool = False
-        ):
+        http2:bool = False,
+        chunk_index:int = 0,
+    ):
         try:
             i= 0
             while i < max_retries:
@@ -743,7 +882,8 @@ class Common:
                     max_parallel_gets = max_paralell_gets,
                     chunk_size        = chunk_size,
                     headers           = headers,
-                    http2             = http2
+                    http2             = http2,
+                    chunk_index       = chunk_index
                 )
                 ms:List[InterfaceX.Metadata] = []
                 xs:List[Tuple[int, npt.NDArray,bytes]] = []
@@ -791,8 +931,9 @@ class Common:
         timeout:int = 120,
         chunk_size:str="256kb",
         headers:Dict[str,str] ={},
-        http2:bool = False
-        ):
+        http2:bool = False,
+        chunk_index:int = 0
+    ):
 
             x_result = client.get_chunks(
                 bucket_id         = bucket_id,
@@ -805,7 +946,8 @@ class Common:
                 max_parallel_gets = max_paralell_gets,
                 chunk_size        = chunk_size,
                 headers           = headers,
-                http2             = http2
+                http2             = http2,
+                chunk_index       = chunk_index
             )
             async for (m,data) in x_result:
                 shape = eval(m.tags.get("shape"))
@@ -831,7 +973,8 @@ class Common:
             timeout:int = 120,
             chunk_size:str="256kb",
             headers:Dict[str,str] ={},
-            http2:bool = False
+            http2:bool = False,
+            chunk_index:int = 0
     )-> List[PyCtxt]:
         get_chunks_generator = client.get_chunks(
             key               = key,
@@ -844,7 +987,8 @@ class Common:
             timeout           = timeout, 
             chunk_size        = chunk_size,
             headers           = headers,
-            http2             = http2
+            http2             = http2,
+            chunk_index       = chunk_index
         )
         xs:List[Tuple[int, List[PyCtxt]]] = []
         async for (m,data) in get_chunks_generator:
@@ -876,8 +1020,9 @@ class Common:
         timeout:int = 120,
         chunk_size:str="256kb",
         headers:Dict[str,str] = {},
-        http2:bool = False
-        ):
+        http2:bool = False, 
+        chunk_index:int =0
+    ):
         res = client.get_chunks(
             bucket_id         = bucket_id,
             key               = key,
@@ -889,7 +1034,8 @@ class Common:
             headers           = headers,
             max_retries       = max_retries,
             http2             = http2,
-            max_parallel_gets = max_paralell_gets
+            max_parallel_gets = max_paralell_gets,
+            chunk_index       = chunk_index
         )
         xs = []
         async for (m,c) in res:
