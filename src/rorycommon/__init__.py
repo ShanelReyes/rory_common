@@ -760,16 +760,16 @@ class Common:
     
 
     @staticmethod
-    def segment_and_encrypt_paillier_with_executor(executor:ProcessPoolExecutor,key:str,dataowner:DataOwner,plaintext_matrix:npt.NDArray, n:int, np_random:bool, num_chunks:int=2 ):
+    def segment_and_encrypt_paillier_with_executor(executor:ProcessPoolExecutor,key:str,dataowner:DataOwner,plaintext_matrix:npt.NDArray, n:int, num_chunks:int=2 ):
         plaintext_matrix_chunks:Chunks = Chunks.from_ndarray(ndarray= plaintext_matrix, group_id = key, num_chunks= num_chunks).unwrap()
         awaitable_chunks:List[Awaitable[Chunk]] = []
         for plaintext_matrix_chunk in plaintext_matrix_chunks.iter():
-            future = executor.submit(Common.encrypt_chunk_paillier,key = key, dataowner = dataowner,chunk = plaintext_matrix_chunk, np_random = np_random)
+            future = executor.submit(Common.encrypt_chunk_paillier,key = key, dataowner = dataowner,chunk = plaintext_matrix_chunk)
             awaitable_chunks.append(future)
         return Chunks(chs= Common.to_chunks_generator(awaitable_chunks=awaitable_chunks),n =n  )
     
     @staticmethod
-    def encrypt_chunk_paillier(key:str,dataowner:DataOwner,chunk:Chunk, np_random:bool)-> Chunk:
+    def encrypt_chunk_paillier(key:str,dataowner:DataOwner,chunk:Chunk)-> Chunk:
         ptm = chunk.to_ndarray().unwrap()
-        encyrpted_chunk:npt.NDArray = dataowner.paillier_encrypt_matrix_chunk(plaintext_matrix = ptm, np_random=np_random)
+        encyrpted_chunk:npt.NDArray = dataowner.paillier_encrypt_matrix_chunk(plaintext_matrix = ptm)
         return Chunk.from_ndarray(group_id=key, index= chunk.index, ndarray= encyrpted_chunk, chunk_id=Some("{}_{}".format(key,chunk.index)))

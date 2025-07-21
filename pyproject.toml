@@ -1,6 +1,6 @@
 [project]
 name = "rorycommon"
-version = "0.0.59"
+version = "0.0.65"
 description = ""
 authors = [
     {name = "Ignacio Castillo",email = "ignacio.bcastillo@gmail.com"}
@@ -11,7 +11,7 @@ dependencies = [
     "pandas (>=2.2.3,<3.0.0)",
     "numpy (>=2.2.4)",
     "pyfhel (>=3.4.2)",
-    "rory (==0.0.212)",
+    "rory (==0.0.216)",
     "mictlanx (==0.0.161a35)",
 ]
 
