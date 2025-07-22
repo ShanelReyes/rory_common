@@ -781,13 +781,13 @@ traitlets = "*"
 
 [[package]]
 name = "mictlanx"
-version = "0.0.161a33"
+version = "0.0.161a35"
 description = "MictlanX Client - safely store your data and access them from any application"
 optional = false
 python-versions = ">=3.9,<4"
 groups = ["main"]
 files = [
-    {file = "mictlanx-0.0.161a33.tar.gz", hash = "sha256:049d8d6ad531d88f65f0d32a45160d1cff784bd2f2f8e406da80f11b2beb1960"},
+    {file = "mictlanx-0.0.161a35.tar.gz", hash = "sha256:ae4168d1a363543426157a61df14eb99edc6ab078ef3df73862f70b3aeb4404b"},
 ]
 
 [package.dependencies]
@@ -1086,6 +1086,22 @@ files = [
 
 [package.dependencies]
 ptyprocess = ">=0.5"
+
+[[package]]
+name = "phe"
+version = "1.5.0"
+description = "Partially Homomorphic Encryption library for Python"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "phe-1.5.0-py2.py3-none-any.whl", hash = "sha256:a0d0098e22474b3027cbc0b05e9de2290bc603f1728bf401f498abbdbe795391"},
+    {file = "phe-1.5.0.tar.gz", hash = "sha256:992fb7091d2427f0d9733946f8f350acdd4d1d012057f2aad364ba79f970339c"},
+]
+
+[package.extras]
+cli = ["click"]
+examples = ["numpy", "scipy", "sklearn"]
 
 [[package]]
 name = "platformdirs"
@@ -1717,20 +1733,23 @@ py = ">=1.4.26,<2.0.0"
 
 [[package]]
 name = "rory"
-version = "0.0.204"
+version = "0.0.220"
 description = "Core modules of Secure Rory"
 optional = false
 python-versions = ">=3.9,<4"
 groups = ["main"]
 files = [
-    {file = "rory-0.0.204-py3-none-any.whl", hash = "sha256:c3719b35577e09ef65ee326750743f99109e032039bdbc17060a4ffbaa3f0929"},
-    {file = "rory-0.0.204.tar.gz", hash = "sha256:e1878103ca38b809b52171dc1c225137ef08710850656c12cd2622a6623b815a"},
+    {file = "rory-0.0.220-py3-none-any.whl", hash = "sha256:6f315ee587bdf91144c924cef822c5f9f5d9323bae6277a3085be0e7ea255fad"},
+    {file = "rory-0.0.220.tar.gz", hash = "sha256:d1a50e83b93fcfc87bad6f1a3ed4172c68e8ee641a93cf1c2554f49e2323ae1b"},
 ]
 
 [package.dependencies]
 numpy = ">=1.21.0,<=2.2.5"
 option = ">=2.1.0,<3.0.0"
-pyfhel = ">=3.4.2,<4.0.0"
+phe = ">=1.5.0,<2.0.0"
+
+[package.extras]
+pqc = ["pyfhel (>=3.4.2,<4.0.0)"]
 
 [package.source]
 type = "legacy"
@@ -1983,4 +2002,4 @@ reference = "testpypi"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4"
-content-hash = "612bddf11694ace98090863efaa2a059ec25522f13ab5adcd6887be128edafe0"
+content-hash = "304423c6b12b6cda9437ceec752bd00feb84b557f1088921c5288843e071dd93"

@@ -12,6 +12,7 @@ import os
 from typing import Tuple, Generator,Dict
 from mictlanx.utils.segmentation import Chunks,Chunk
 from rory.core.security.dataowner import DataOwner
+from rory.core.security.dataowner_paillier import DataOwner as DataOwnerPHE
 from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
 from rory.core.security.cryptosystem.paillier import Paillier
 from typing import List,Awaitable
@@ -769,7 +770,9 @@ class Common:
         return Chunks(chs= Common.to_chunks_generator(awaitable_chunks=awaitable_chunks),n =n  )
     
     @staticmethod
-    def encrypt_chunk_paillier(key:str,dataowner:DataOwner,chunk:Chunk)-> Chunk:
+    def encrypt_chunk_paillier(key:str,dataowner:DataOwnerPHE,chunk:Chunk)-> Chunk:
         ptm = chunk.to_ndarray().unwrap()
+        # print("PTM", len(ptm),dataowner)
         encyrpted_chunk:npt.NDArray = dataowner.paillier_encrypt_matrix_chunk(plaintext_matrix = ptm)
+        # print("HERE!", encyrpted_chunk)
         return Chunk.from_ndarray(group_id=key, index= chunk.index, ndarray= encyrpted_chunk, chunk_id=Some("{}_{}".format(key,chunk.index)))
