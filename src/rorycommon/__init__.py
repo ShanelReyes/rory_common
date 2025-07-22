@@ -13,6 +13,8 @@ from typing import Tuple, Generator,Dict,AsyncGenerator
 from mictlanx.utils.segmentation import Chunks,Chunk
 from rory.core.security.dataowner import DataOwner
 from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
+# from rory.core.security.dataowner
+
 from rory.core.security.cryptosystem.paillier import Paillier
 from typing import List,Awaitable
 from concurrent.futures import ProcessPoolExecutor
@@ -47,7 +49,7 @@ class Common:
         max_backoff:int= 5, 
         max_attempts:int = 10,
         timeout:int=120
-    ):
+    ):      
             res = dataowner.liu_encrypt_matrix_chunk(ndarray)
             m = res.shape[2]
             new_full_shape = (full_shape[0],full_shape[1], m)
@@ -77,6 +79,87 @@ class Common:
                 return res_dp_chunk
             return res_dp_chunk
                 # print("FAILED TO PUT", new_c.chunk_id)
+    @staticmethod
+    async def encrypt_ckks_and_put_chunk(
+        client:AsyncClient,
+        bucket_id:str,
+        ball_id:str,
+        index:int,
+        dataowner: DataOwnerPQC,
+        ndarray:npt.NDArray,
+        full_shape:Tuple[int,int],
+        num_chunks:int,
+        max_backoff:int= 5, 
+        max_attempts:int = 10,
+        timeout:int=120
+    ):      
+            encyrpted_chunk = dataowner.ckks_encrypt_matrix_chunk(ndarray)
+            data = Common.from_pyctxt_list_to_bytes(xs=encyrpted_chunk)
+            new_c= Chunk(
+                group_id = ball_id, 
+                index = index, 
+                data = data, 
+                chunk_id = Some("{}_{}".format(ball_id,index)),
+                metadata= {
+                    "full_shape":str(full_shape),
+                    "num_chunks":str(num_chunks)
+                }
+            )
+            res_dp_chunk = await Common.delete_and_put_chunk(
+                client=client, 
+                bucket_id=bucket_id,
+                ball_id=ball_id,
+                chunk=new_c,
+                tags ={},
+                max_backoff=max_backoff, 
+                max_tries=max_attempts,
+                timeout=timeout
+            )
+            if res_dp_chunk.is_err:
+                return res_dp_chunk
+            return res_dp_chunk
+
+    @staticmethod
+    async def encrypt_paillier_and_put_chunk(
+        client:AsyncClient,
+        bucket_id:str,
+        ball_id:str,
+        index:int,
+        dataowner: DataOwnerPQC,
+        ndarray:npt.NDArray,
+        full_shape:Tuple[int,int],
+        num_chunks:int,
+        max_backoff:int= 5, 
+        max_attempts:int = 10,
+        timeout:int=120
+    ):      
+            encyrpted_chunk = dataowner.ckks_encrypt_matrix_chunk(ndarray)
+            data = Common.from_pyctxt_list_to_bytes(xs=encyrpted_chunk)
+            new_c= Chunk(
+                group_id = ball_id, 
+                index = index, 
+                data = data, 
+                chunk_id = Some("{}_{}".format(ball_id,index)),
+                metadata= {
+                    "full_shape":str(full_shape),
+                    "num_chunks":str(num_chunks)
+                }
+            )
+            res_dp_chunk = await Common.delete_and_put_chunk(
+                client=client, 
+                bucket_id=bucket_id,
+                ball_id=ball_id,
+                chunk=new_c,
+                tags ={},
+                max_backoff=max_backoff, 
+                max_tries=max_attempts,
+                timeout=timeout
+            )
+            if res_dp_chunk.is_err:
+                return res_dp_chunk
+            return res_dp_chunk
+      
+
     @staticmethod
     async def get_by_chunk_index(
         client:AsyncClient,
@@ -955,9 +1038,56 @@ class Common:
                 dtype = m.tags.get("dtype","float64")
                 index = int(m.tags.get("index","-1"))
                 # print(shape,dtype,index)
-                yield index,np.frombuffer(data.tobytes(),dtype=dtype).reshape(shape)
+                yield index,m,np.frombuffer(data.tobytes(),dtype=dtype).reshape(shape)
 
-
+    @staticmethod
+    async def get_pyctxt_chunk_or_error(
+        client:AsyncClient,
+        ckks:Ckks,
+        ball_id:str, 
+        bucket_id:str,
+        index:int,
+        max_retries:int = 5,
+        delay:float = 1,
+        backoff_factor:float =.5,
+        max_paralell_gets:int = 10, 
+        force:bool = False,
+        timeout:int = 120,
+        chunk_size:str="256kb",
+        headers:Dict[str,str] ={},
+        http2:bool = False,
+        max_backoff:int = 5
+    )->Tuple[List[PyCtxt],InterfaceX.Metadata]:
+        i =0
+        while i <= max_retries :
+            x = await client.get_chunk(
+                bucket_id         = bucket_id,
+                ball_id           = ball_id,
+                index             = index,
+                max_parallel_gets = max_paralell_gets,
+                headers           = headers,
+                chunk_size        = chunk_size,
+                timeout           = timeout,
+                http2             = http2,
+                max_retries       = max_retries,
+                delay             = delay,
+                backoff_factor    = backoff_factor,
+                force             = force, 
+                max_backoff       = max_backoff
+            )
+            if x.is_err:
+                e = x.unwrap_err()
+                print(f"Retrying in {delay} seconds... (Attemp {i}/{max_retries})")
+                await asyncio.sleep(delay)
+                i+=1
+                continue
+            (data,m) = x.unwrap()
+            data_bytes = data.data
+            x          = pickle.loads(data_bytes)
+            xx         = Common.from_bytes_to_pyctxt_list(ckks=ckks, xs=x)
+            return xx,m
+    
+        raise Exception(f"Get {bucket_id}@{ball_id} failed: Max tries reached")
 
 
     @staticmethod

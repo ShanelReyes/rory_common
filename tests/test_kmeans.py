@@ -165,7 +165,7 @@ async def test_get_chunks():
     k = 3
     kmeans = MiniBatchKMeansCustom(n_clusters=k, random_state=None)
 
-    async for (chunk_index, c) in RoryCommon.iterate_matrix_chunks(
+    async for (chunk_index,m, c) in RoryCommon.iterate_matrix_chunks(
         client=client,
         bucket_id=bucket_id,
         ball_id=ball_id,

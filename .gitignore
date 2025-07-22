@@ -1,3 +1,4 @@
 dist/
 *.ipynb
 **/__pycache__/
+*.lock
