@@ -43,7 +43,7 @@ client = AsyncClient(
     debug=False,
     eviction_policy="LRU",
     max_workers= MICTLANX_MAX_WORKERS,
-    routers=list(Utils.routers_from_str(routers_str=MICTLANX_ROUTERS,protocol="https")),
+    routers=list(Utils.routers_from_str(routers_str=MICTLANX_ROUTERS,protocol="http")),
     verify=False
 )
 dataowner = DataOwner(
@@ -60,6 +60,54 @@ dataowner = DataOwner(
 # key = "encryptedskmeansy"
 key = "encryptedskmeanspqc1"
 bucket_id = "rory"
+
+ckks = Ckks.from_pyfhel(
+    path="/rory/keys",
+)
+
+
+dataowner_pqc = DataOwnerPQC(
+    scheme=ckks,
+    securitylevel=128
+
+)
+
+key = "encryptedskmeansy"
+bucket_id = "rory"
+
+
+# @pytest.mark.skip("")
+@pytest.mark.asyncio
+async def test_get_encrypt_ckks_matrix_chunk():
+    res = await RoryCommon.get_pyctxt_chunk_or_error(
+        client= client,
+        ckks= dataowner_pqc.scheme,
+        ball_id="x",
+        bucket_id = "rory",
+        index = 0
+    )
+    print(res)
+
+@pytest.mark.skip("")
+@pytest.mark.asyncio
+async def test_encrypt_ckks_matrix_chunk():
+    g = RoryCommon.iterate_matrix_chunks(client=client, ball_id="bxx",bucket_id="rory")
+    async for (index,m, ndarray) in g:
+        res = await RoryCommon.encrypt_ckks_and_put_chunk(
+            ball_id    = "x",
+            bucket_id  = "rory",
+            client     = client,
+            index      = index,
+            dataowner  = dataowner_pqc,
+            full_shape = eval(m.tags.get("full_shape","(1000,10)")),
+            ndarray    = ndarray,
+            num_chunks = int(m.tags.get("num_chunks","0"))
+        )
+        print(res)
+
+
+
+
 @pytest.mark.skip("")
 @pytest.mark.asyncio
 async def test_put_chunks():
@@ -406,6 +454,8 @@ async def test_get_encrypted_shift_matrix():
     )
     print(zz)
 
+
+@pytest.mark.skip("")
 @pytest.mark.asyncio
 async def test_getx():
     # key = "encryptedsknnpqc1aa"

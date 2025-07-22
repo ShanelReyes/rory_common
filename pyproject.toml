@@ -6,23 +6,32 @@ authors = [
     {name = "Ignacio Castillo",email = "ignacio.bcastillo@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.10,<4"
-dependencies = [
-    "pandas (>=2.2.3,<3.0.0)",
-    "numpy (>=2.2.4)",
-    "pyfhel (>=3.4.2)",
-    "mictlanx (==0.0.161a35)",
-    "rory (==0.0.220)",
-]
+requires-python = ">=3.11,<4"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<4.0"
+pandas = ">=2.2.3,<3.0.0"
+numpy = ">=2.2.4"
+rory = "0.0.220"
+pytest = ">=8.4.1,<9.0.0"
+pyfhel = { git = "https://github.com/ibarrond/Pyfhel.git", branch = "dev" }
+mictlanx = "0.0.161a39"
+phe = "^1.5.0"
+
+
+
 
 [tool.poetry]
 packages = [{include = "rorycommon", from = "src"}]
 
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^8.3.5"
 pytest-asyncio = "^0.25.3"
 ipykernel = "^6.29.5"
+pytest = "^8.4.1"
+seaborn = "^0.13.2"
+scikit-learn = "^1.7.0"
+
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
