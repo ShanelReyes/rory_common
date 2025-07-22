@@ -6,6 +6,8 @@ from mictlanx import AsyncClient
 from mictlanx.utils import Utils
 from concurrent.futures import ProcessPoolExecutor
 from rory.core.security.dataowner import DataOwner
+from rory.core.security.pqc.dataowner import DataOwner as RataOwnerPQC
+
 from rory.core.security.cryptosystem.liu import Liu
 from xolo.utils.utils import Utils as XoloUtils
 from rory.core.security.cryptosystem.pqc.ckks import Ckks
@@ -19,9 +21,26 @@ dataowner = DataOwner(
         security_level = 128
     ),
 )
+ckks = Ckks.from_pyfhel(
+    _round             = True,
+    decimals           = 2,
+    path               = "/rory/keys",
+    # ctx_filename       = ctx_filename,
+    # pubkey_filename    = pubkey_filename,
+    # secretkey_filename = secretkey_filename,
+    # relinkey_filename  = relinkey_filename,
+) 
+dataowner_pqc = RataOwnerPQC(
+    scheme=ckks,
+    securitylevel=128
+
+)
 
 key = "encryptedskmeansy"
 bucket_id = "rory"
+
+
+
 
 @pytest.mark.skip("")
 @pytest.mark.asyncio
