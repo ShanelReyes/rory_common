@@ -33,18 +33,49 @@ client = AsyncClient(
     verify=False
 )
 
-# @pytest.mark.skip("")
+@pytest.mark.skip("")
+@pytest.mark.asyncio
+async def test_put_chunk():
+    ball_id = "x"
+    do = DataOwner(securitylevel=128)
+    do.generate_keys()
+    t1           = T.time()
+    dataset_size = (100,10)
+    xs           = np.random.random(size=dataset_size )
+    res = await RoryCommon.encrypt_paillier_and_put_chunk(
+        client=client,
+        bucket_id="rory",
+        ball_id="phex",
+        dataowner=do,
+        full_shape=(1000,10),
+        index=1,
+        max_attempts=10,
+        max_backoff=5,
+        ndarray=xs,
+        num_chunks=10,
+        timeout=120,
+    )
+    print(res)
+    # max_workers  = 2
+    # ppe          = ProcessPoolExecutor(max_workers=max_workers)
+    # res          = RoryCommon.segment_and_encrypt_paillier_with_executor(executor=ppe, key="x",dataowner=do,num_chunks=max_workers,plaintext_matrix=xs,n=len(xs))
+    # for c in res:
+        # res = RoryCommon.paill
+        # print(c)
+    # res = await RoryCommon.get_paillier_chunk_or_error(client=client, bucket_id="rory",ball_id=ball_id,index=1)
+    # print(res)
+@pytest.mark.skip("")
 @pytest.mark.asyncio
 async def test_get_chunk():
-    ball_id = "x"
+    ball_id = "phex"
     res = await RoryCommon.get_paillier_chunk_or_error(client=client, bucket_id="rory",ball_id=ball_id,index=1)
     print(res)
 
 
-@pytest.mark.skip("")
+# @pytest.mark.skip("")
 @pytest.mark.asyncio
 async def test_get():
-    ball_id = "x"
+    ball_id = "phex"
     res = await RoryCommon.get_paillier_matrix(client=client, bucket_id="rory",ball_id=ball_id)
     print(res)
 @pytest.mark.skip("")

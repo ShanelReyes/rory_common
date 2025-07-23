@@ -102,7 +102,9 @@ class Common:
                 chunk_id = Some("{}_{}".format(ball_id,index)),
                 metadata= {
                     "full_shape":str(full_shape),
-                    "num_chunks":str(num_chunks)
+                    "num_chunks":str(num_chunks),
+                    # "dtype":str(encyrpted_chunk.dtype),
+                    # "shape":str(encyrpted_chunk.shape),
                 }
             )
             res_dp_chunk = await Common.delete_and_put_chunk(
@@ -133,8 +135,9 @@ class Common:
         max_attempts:int = 10,
         timeout:int=120
     ):      
-            encyrpted_chunk = dataowner.paillier_encrypt_matrix_chunk(ndarray)
-            data = Common.from_pyctxt_list_to_bytes(xs=encyrpted_chunk)
+            encrypted_chunk = dataowner.paillier_encrypt_matrix_chunk(ndarray)
+            # data = Common.from_pyctxt_list_to_bytes(xs=encyrpted_chunk)
+            data = pickle.dumps(encrypted_chunk)
             new_c= Chunk(
                 group_id = ball_id, 
                 index = index, 
@@ -142,7 +145,9 @@ class Common:
                 chunk_id = Some("{}_{}".format(ball_id,index)),
                 metadata= {
                     "full_shape":str(full_shape),
-                    "num_chunks":str(num_chunks)
+                    "num_chunks":str(num_chunks),
+                    "shape":str(encrypted_chunk.shape),
+                    "dtype":str(encrypted_chunk.dtype)
                 }
             )
             res_dp_chunk = await Common.delete_and_put_chunk(
