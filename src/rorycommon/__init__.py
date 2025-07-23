@@ -20,7 +20,9 @@ from Pyfhel import PyCtxt
 import pickle
 from rory.core.security.cryptosystem.pqc.ckks import Ckks
 import hashlib as H
+from phe import EncryptedNumber,PaillierPublicKey
 from mictlanx.logger.log import Log
+
 
 DEBUG = bool(int(os.environ.get("RORY_COMMON_DEBUG","1")))
 
@@ -123,7 +125,7 @@ class Common:
         bucket_id:str,
         ball_id:str,
         index:int,
-        dataowner: DataOwnerPQC,
+        dataowner: DataOwnerPHE,
         ndarray:npt.NDArray,
         full_shape:Tuple[int,int],
         num_chunks:int,
@@ -131,7 +133,7 @@ class Common:
         max_attempts:int = 10,
         timeout:int=120
     ):      
-            encyrpted_chunk = dataowner.ckks_encrypt_matrix_chunk(ndarray)
+            encyrpted_chunk = dataowner.paillier_encrypt_matrix_chunk(ndarray)
             data = Common.from_pyctxt_list_to_bytes(xs=encyrpted_chunk)
             new_c= Chunk(
                 group_id = ball_id, 
@@ -745,7 +747,7 @@ class Common:
         while  i < max_tries: 
             _delete_result = await Common.while_not_delete_ball_id(STORAGE_CLIENT = client, bucket_id = bucket_id, key = key,timeout=timeout,max_tries=max_tries)
 
-            put_res = await client.put_single_chunk(bucket_id = bucket_id, key = key, chunks = chunks, tags = tags, timeout = timeout)
+            put_res = await client.put_chunks(bucket_id = bucket_id, key = key, chunks = chunks, tags = tags, timeout = timeout)
             L.debug({
                 "event":"DELETE.COMPLETED",
                 "bucket_id":bucket_id,
@@ -757,7 +759,7 @@ class Common:
                 return put_res
             
             # condition = put_res.is_err or _delete_result >0
-            condition = put_res.is_err and not (_delete_result == 0)
+            condition = put_res.is_err and not (_delete_result <=0)
             # and not (_delete_result == 0)
             if condition:
                 L.error({
@@ -765,9 +767,10 @@ class Common:
                     "i":i
                 })
                 print(f"Put failed reytring in 1 second... Attemp {i+1}/{max_tries}")
+                i+=1
                 await asyncio.sleep(1)
-            i+=1
-            i+=1
+                continue
+
         L.debug(
             {
                 "event":"DELETE.PUT.CHUNKS",
@@ -972,6 +975,7 @@ class Common:
                 h = H.sha256()
                 async for (m,data) in x_result:
                     data_bytes = data.tobytes()
+                    print("DB",data_bytes)
                     ms.append(m)
                     shape = eval(m.tags.get("shape"))
                     dtype = m.tags.get("dtype","float64")
@@ -1086,7 +1090,111 @@ class Common:
             return xx,m
     
         raise Exception(f"Get {bucket_id}@{ball_id} failed: Max tries reached")
-
+    @staticmethod
+    async def get_paillier_chunk_or_error(
+        client:AsyncClient,
+        ball_id:str, 
+        bucket_id:str,
+        index:int,
+        max_retries:int = 5,
+        delay:float = 1,
+        backoff_factor:float =.5,
+        max_paralell_gets:int = 10, 
+        force:bool = False,
+        timeout:int = 120,
+        chunk_size:str="256kb",
+        headers:Dict[str,str] ={},
+        http2:bool = False,
+        max_backoff:int = 5
+    )->Tuple[List[PyCtxt],InterfaceX.Metadata]:
+        i =0
+        while i <= max_retries :
+            x = await client.get_chunk(
+                bucket_id         = bucket_id,
+                ball_id           = ball_id,
+                index             = index,
+                max_parallel_gets = max_paralell_gets,
+                headers           = headers,
+                chunk_size        = chunk_size,
+                timeout           = timeout,
+                http2             = http2,
+                max_retries       = max_retries,
+                delay             = delay,
+                backoff_factor    = backoff_factor,
+                force             = force, 
+                max_backoff       = max_backoff
+            )
+            if x.is_err:
+                e = x.unwrap_err()
+                print(f"Retrying in {delay} seconds... (Attemp {i}/{max_retries})")
+                await asyncio.sleep(delay)
+                i+=1
+                continue
+            (data,m) = x.unwrap()
+            data_bytes = data.data
+            x          = pickle.loads(data_bytes)
+            # xx         = Common.from_bytes_to_pyctxt_list(ckks=ckks, xs=x)
+            return x,m
+    
+        raise Exception(f"Get {bucket_id}@{ball_id} failed: Max tries reached")
+    @staticmethod
+    async def get_paillier_matrix(
+        client:AsyncClient,
+        ball_id:str, 
+        bucket_id:str,
+        max_retries:int = 5,
+        delay:float = 1,
+        backoff_factor:float =.5,
+        max_paralell_gets:int = 10, 
+        force:bool = False,
+        timeout:int = 120,
+        chunk_size:str="256kb",
+        headers:Dict[str,str] ={},
+        http2:bool = False,
+        chunk_index:int = 0
+    ):
+        try:
+            i= 0
+            while i < max_retries:
+                x_result = client.get_chunks(
+                    bucket_id         = bucket_id,
+                    key               = ball_id,
+                    timeout           = timeout,
+                    max_retries       = max_retries,
+                    delay             = delay,
+                    backoff_factor    = backoff_factor,
+                    force             = force,
+                    max_parallel_gets = max_paralell_gets,
+                    chunk_size        = chunk_size,
+                    headers           = headers,
+                    http2             = http2,
+                    chunk_index       = chunk_index
+                )
+                ms:List[InterfaceX.Metadata] = []
+                xs:List[Tuple[int, npt.NDArray]] = []
+                async for (m,data) in x_result:
+                    ms.append(m)
+                    data_bytes = data.tobytes()
+                    shape      = eval(m.tags.get("shape"))
+                    dtype      = m.tags.get("dtype","float64")
+                    x          = pickle.loads(data_bytes)
+                    index = int(m.tags.get("index","-1"))
+                    xs.append((index,x))
+                if len(ms) >0:
+                    m = ms[0]
+                    num_chunks = int(m.tags.get("num_chunks","-1"))
+                    if num_chunks == -1 or num_chunks != len(ms):
+                        return Err(Exception("Faile to get the chunks"))
+                    else:
+                        xs_sorted = sorted(xs, key=lambda t: t[0])  # Sort by index value
+                        ordered_chunks = []
+                        for (i,nd) in xs_sorted:
+                            ordered_chunks.append(nd)
+                        return Ok(np.concatenate(ordered_chunks, axis=0))
+                return Err(Exception("Failed to get chunks. "))
+        except Exception as e:
+            return Err(e)
+        
 
     @staticmethod
     async def get_pyctxt(
@@ -1172,8 +1280,12 @@ class Common:
             xs.append(x)
         res = np.vstack(xs)
         return res
+    def serialize_matrix_with_pickle(enc_matrix):
+        return pickle.dumps(enc_matrix, protocol=pickle.HIGHEST_PROTOCOL)
     
-
+    def deserialize_matrix_with_pickle(serialized_bytes):
+        return pickle.loads(serialized_bytes)
+    
     @staticmethod
     def segment_and_encrypt_paillier_with_executor(executor:ProcessPoolExecutor,key:str,dataowner:DataOwner,plaintext_matrix:npt.NDArray, n:int, num_chunks:int=2 ):
         plaintext_matrix_chunks:Chunks = Chunks.from_ndarray(ndarray= plaintext_matrix, group_id = key, num_chunks= num_chunks).unwrap()
@@ -1187,6 +1299,10 @@ class Common:
     def encrypt_chunk_paillier(key:str,dataowner:DataOwnerPHE,chunk:Chunk)-> Chunk:
         ptm = chunk.to_ndarray().unwrap()
         # print("PTM", len(ptm),dataowner)
-        encyrpted_chunk:npt.NDArray = dataowner.paillier_encrypt_matrix_chunk(plaintext_matrix = ptm)
-        # print("HERE!", encyrpted_chunk)
-        return Chunk.from_ndarray(group_id=key, index= chunk.index, ndarray= encyrpted_chunk, chunk_id=Some("{}_{}".format(key,chunk.index)))
+        encyrpted_chunk = Common.serialize_matrix_with_pickle(dataowner.paillier_encrypt_matrix_chunk(plaintext_matrix = ptm))
+        # return Chunk.from_bytes()
+        # print("HERE!", encyrpted_chunk.shape,encyrpted_chunk.dtype)
+        return Chunk.from_bytes(group_id=key, index= chunk.index, data= encyrpted_chunk, chunk_id=Some("{}_{}".format(key,chunk.index)),metadata={
+            "shape":str(ptm.shape),
+            "dtype":str(ptm.dtype)
+        } )
