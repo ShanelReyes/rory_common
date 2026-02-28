@@ -72,7 +72,7 @@ async def test_get_chunk():
     print(res)
 
 
-# @pytest.mark.skip("")
+@pytest.mark.skip("")
 @pytest.mark.asyncio
 async def test_get():
     ball_id = "phex"
@@ -127,5 +127,6 @@ def test_paralell_phe():
 
 @pytest.mark.skip("test phe parallel")
 def test_generate_keys():
-    do = DataOwner(securitylevel=256)
-    do.generate_keys(output_path="/rory/schemes_experiments/keys",filename="rory-phe-256",save=True)
+    sl = 256
+    do = DataOwner(securitylevel=sl)
+    do.generate_keys(output_path="/rory/keys",filename=f"rory-phe-{sl}",save=True)
