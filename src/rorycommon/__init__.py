@@ -29,7 +29,6 @@ DEBUG = bool(int(os.environ.get("RORY_COMMON_DEBUG","1")))
 L = Log(
     name=__name__,
     console_handler_filter = lambda r : DEBUG,
-    create_folder=False,
     to_file= False
 )
 
