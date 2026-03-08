@@ -13,20 +13,12 @@ services:
     volumes:
       - mictlanx-router-0-logs:/log
       - ./profiler:/profiler
-
-    # command: gunicorn --worker-class uvicorn.workers.UvicornWorker  mictlanxrouter.server:app --bind ${MICTLANX_ROUTER_HOST-0.0.0.0}:${MICTLANX_ROUTER_PORT-60666}  --workers ${MICTLANX_MAX_WORKERS-1}
-    # command: sleep infinity;
     command: > 
       sh -c 'gunicorn --worker-class uvicorn.workers.UvicornWorker
       mictlanxrouter.server:app
       --bind ${MICTLANX_ROUTER_HOST-0.0.0.0}:${MICTLANX_INTERNAL_ROUTER_PORT-60666}  
       --workers ${MICTLANX_MAX_WORKERS-1}'
 
-    # healthcheck:
-    #   test: ["CMD", "wget", "-qO-", "http://localhost:60666/docs"]
-    #   interval: 15s
-    #   timeout: 5s
-    #   retries: 5
 
   mictlanx-summoner-0:
     image: ${MICTLANX_SUMMONER_IMAGE:-nachocode/mictlanx:summoner-0.1.0a4}
