@@ -1,9 +1,10 @@
 [project]
 name = "rorycommon"
-version = "0.0.69"
+version = "0.0.76"
 description = ""
 authors = [
-    {name = "Ignacio Castillo",email = "ignacio.bcastillo@gmail.com"}
+    {name = "Ignacio Castillo",email = "ignacio.bcastillo@gmail.com"},
+    {name ="Shanel Reyes", email = "shanelreyesp@gmail.com"}
 ]
 readme = "README.md"
 requires-python = ">=3.11,<4"
@@ -12,11 +13,12 @@ requires-python = ">=3.11,<4"
 python = ">=3.11,<4.0"
 pandas = ">=2.2.3,<3.0.0"
 numpy = ">=2.2.4"
-rory = "0.0.220"
+rory = "0.0.222"
 pytest = ">=8.4.1,<9.0.0"
-pyfhel = { git = "https://github.com/ibarrond/Pyfhel.git", branch = "dev" }
-mictlanx = "0.0.161a39"
+mictlanx = "0.1.0a5"
 phe = "^1.5.0"
+pyfhel = "3.5.0"
+python-dotenv = "^1.2.2"
 
 
 
@@ -31,6 +33,9 @@ ipykernel = "^6.29.5"
 pytest = "^8.4.1"
 seaborn = "^0.13.2"
 scikit-learn = "^1.7.0"
+zensical = "^0.0.24"
+mkdocstrings-python = "^2.0.3"
+coverage = "^7.13.4"
 
 
 [build-system]

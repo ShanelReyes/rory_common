@@ -3,8 +3,7 @@ import asyncio
 from mictlanx import AsyncClient
 from rorycommon.utils import Utils as RoryCommonUtils
 import mictlanx.interfaces as InterfaceX
-from option import Option, NONE,Result,Ok,Err,Some
-from functools import reduce
+from option import Option,Result,Ok,Err,Some
 import numpy as np
 import numpy.typing as npt
 import pandas as pd
@@ -20,22 +19,24 @@ from Pyfhel import PyCtxt
 import pickle
 from rory.core.security.cryptosystem.pqc.ckks import Ckks
 import hashlib as H
-from phe import EncryptedNumber,PaillierPublicKey
 from mictlanx.logger.log import Log
 
 
 DEBUG = bool(int(os.environ.get("RORY_COMMON_DEBUG","1")))
-
+RORY_COMMON_LOG_PATH = os.environ.get("RORY_COMMON_LOG_PATH","/mictlanx/client")
 L = Log(
-    name=__name__,
+    name                   = __name__,
     console_handler_filter = lambda r : DEBUG,
-    create_folder=False,
-    to_file= False
+    to_file                = False,
+    path                   = RORY_COMMON_LOG_PATH
 )
 
 
 
 class Common:
+    """
+    Common utility functions for encryption and chunk management.
+    """
     @staticmethod
     async def encrypt_and_put_chunk(
         client:AsyncClient,
@@ -49,35 +50,52 @@ class Common:
         max_backoff:int= 5, 
         max_attempts:int = 10,
         timeout:int=120
-    ):      
-            res = dataowner.liu_encrypt_matrix_chunk(ndarray)
-            m = res.shape[2]
-            new_full_shape = (full_shape[0],full_shape[1], m)
-            new_c = Chunk.from_ndarray(
-                group_id=ball_id,
-                index=index,
-                ndarray=res,
-                metadata={
-                    "full_shape":str(new_full_shape),
-                    "dtype":str(res.dtype),
-                    "shape":str(res.shape),
-                    "num_chunks":str(num_chunks)
-                }, 
-                chunk_id=Some(f"{ball_id}_{index}")
-            )
-            res_dp_chunk = await Common.delete_and_put_chunk(
-                client=client, 
-                bucket_id=bucket_id,
-                ball_id=ball_id,
-                chunk=new_c,
-                tags ={},
-                max_backoff=max_backoff, 
-                max_tries=max_attempts,
-                timeout=timeout
-            )
-            if res_dp_chunk.is_err:
-                return res_dp_chunk
+    ):
+        """
+        Encrypts a chunk of data using the provided data owner and puts it into the storage system.
+
+        Arguments:
+            client (AsyncClient): The asynchronous client to interact with the storage system.
+            bucket_id (str): The ID of the bucket where the chunk will be stored.
+            ball_id (str): The ID of the ball to which the chunk belongs.
+            index (int): The index of the chunk within the ball.
+            dataowner (DataOwner): The data owner responsible for encrypting the chunk.
+            ndarray (npt.NDArray): The NumPy array representing the chunk data.
+            full_shape (Tuple[int, int]): The full shape of the original data.
+            num_chunks (int): The total number of chunks.
+            max_backoff (int, optional): The maximum backoff time for retries. Defaults to 5.
+            max_attempts (int, optional): The maximum number of attempts for retries. Defaults to 10.
+            timeout (int, optional): The timeout for the operation in seconds. Defaults to 120.
+
+        """ 
+        res = dataowner.liu_encrypt_matrix_chunk(ndarray)
+        m = res.shape[2]
+        new_full_shape = (full_shape[0],full_shape[1], m)
+        new_c = Chunk.from_ndarray(
+            group_id=ball_id,
+            index=index,
+            ndarray=res,
+            metadata={
+                "full_shape":str(new_full_shape),
+                "dtype":str(res.dtype),
+                "shape":str(res.shape),
+                "num_chunks":str(num_chunks)
+            }, 
+            chunk_id=Some(f"{ball_id}_{index}")
+        )
+        res_dp_chunk = await Common.delete_and_put_chunk(
+            client      = client,
+            bucket_id   = bucket_id,
+            ball_id     = ball_id,
+            chunk       = new_c,
+            tags        = {},
+            max_backoff = max_backoff,
+            max_tries   = max_attempts,
+            timeout     = timeout
+        )
+        if res_dp_chunk.is_err:
             return res_dp_chunk
+        return res_dp_chunk
                 # print("FAILED TO PUT", new_c.chunk_id)
     @staticmethod
     async def encrypt_ckks_and_put_chunk(
@@ -103,8 +121,6 @@ class Common:
                 metadata= {
                     "full_shape":str(full_shape),
                     "num_chunks":str(num_chunks),
-                    # "dtype":str(encyrpted_chunk.dtype),
-                    # "shape":str(encyrpted_chunk.shape),
                 }
             )
             res_dp_chunk = await Common.delete_and_put_chunk(
@@ -211,9 +227,14 @@ class Common:
         
     @staticmethod
     async def segment_and_put_lazy(
-        client:AsyncClient,bucket_id:str,ball_id:str,
-        path:str,row_chunk_size:int =100,max_attempts:int = 10,
-        timeout:int=120,max_backoff:int =5,tags:Dict[str,str]={})->AsyncGenerator[InterfaceX.PutChunkedResponse, None]:
+        client:AsyncClient,
+        bucket_id:str,
+        ball_id:str,
+        path:str,
+        row_chunk_size:int =100,
+        max_attempts:int = 10,
+        timeout:int=120,max_backoff:int =5,tags:Dict[str,str]={}
+    )->AsyncGenerator[InterfaceX.PutChunkedResponse, None]:
         chunks_generator = RoryCommonUtils.read_chunks_numpy(ball_id=ball_id,filename=path,row_chunk=row_chunk_size)
         for c in chunks_generator:
             res = await Common.delete_and_put_chunk(
@@ -437,8 +458,20 @@ class Common:
 
 
     @staticmethod
-    def segment_and_encrypt_ckks_with_executor(executor:ProcessPoolExecutor,key:str,plaintext_matrix:npt.NDArray,n:int,_round:bool, decimals:int, path:str, 
-                                               ctx_filename:str, pubkey_filename:str, secretkey_filename:str, num_chunks:int=2, relinkey_filename:str=""):
+    def segment_and_encrypt_ckks_with_executor(
+        executor:ProcessPoolExecutor,
+        key:str,
+        plaintext_matrix:npt.NDArray,
+        n:int,
+        _round:bool,
+        decimals:int,
+        path:str,
+        ctx_filename:str,
+        pubkey_filename:str,
+        secretkey_filename:str,
+        num_chunks:int=2,
+        relinkey_filename:str=""
+    ):
         plaintext_matrix_chunks = Chunks.from_ndarray( ndarray = plaintext_matrix, group_id = key, num_chunks = num_chunks).unwrap()
         awaitable_chunks:List[Awaitable[Chunk]] = []
         for plaintext_matrix_chunk in plaintext_matrix_chunks.iter():
@@ -487,7 +520,10 @@ class Common:
         key:str,
         plaintext_matrix:npt.NDArray,
         n:int,
-        _round:bool, decimals:int, path:str, ctx_filename:str, 
+        _round:bool, 
+        decimals:int, 
+        path:str, 
+        ctx_filename:str, 
         pubkey_filename:str, 
         secretkey_filename:str,
         num_chunks:int=2, 
@@ -542,6 +578,7 @@ class Common:
             return Chunk(group_id = key, index = chunk.index, data = data, chunk_id = Some("{}_{}".format(key,chunk.index)))
         except Exception as e:
             print("ENCRYPT_CHUNK_ERROR",e)
+            raise e
     
 
     @staticmethod
@@ -582,11 +619,11 @@ class Common:
             matrix.append(tmp_row)
         return matrix
     @staticmethod
-    async def while_not_delete_key(STORAGE_CLIENT:AsyncClient ,bucket_id:str, key:str,timeout:int = 3600,max_tries:int = 5): 
+    async def while_not_delete_key(client:AsyncClient ,bucket_id:str, key:str,timeout:int = 3600,max_tries:int = 5): 
         n_deletes = -1
         i = 0
         while (n_deletes ==-1 or n_deletes >0) and i <= max_tries:
-            _delete_result = await STORAGE_CLIENT.delete_by_key(bucket_id=bucket_id,key=key,timeout=timeout,force = True)
+            _delete_result = await client.delete_by_key(bucket_id=bucket_id,key=key,timeout=timeout,force = True)
 
             if _delete_result.is_ok:
                 del_response = _delete_result.unwrap()
@@ -660,7 +697,7 @@ class Common:
         tags:Dict[str,str]={},
         timeout:int = 3600,
         max_tries:int =5
-    )->Result[InterfaceX.PutChunkedResponse,Exception]:
+    )->Result[bool,Exception]:
         condition = True
         put_res = None
         i = 0
@@ -690,21 +727,23 @@ class Common:
         timeout:int = 3600,
         max_tries:int =5,
         max_backoff:int =5
-    )->Result[InterfaceX.PutChunkedResponse,Exception]:
+    )->Result[bool,Exception]:
         condition = True
         put_res = None
         i = 0
         while  i < max_tries: 
-            _delete_result = await Common.while_not_delete_key(STORAGE_CLIENT = client, bucket_id = bucket_id, key = chunk.chunk_id,timeout=timeout,max_tries=max_tries)
+            _delete_result = await Common.while_not_delete_key(client = client, bucket_id = bucket_id, key = chunk.chunk_id,timeout=timeout,max_tries=max_tries)
+            
             put_res = await client.put_single_chunk(
-                bucket_id = bucket_id, 
-                ball_id = ball_id,
-                chunk=chunk, 
-                tags = tags, 
-                timeout = timeout,
-                max_tries=max_tries,
-                max_backoff=max_backoff
+                bucket_id   = bucket_id,
+                ball_id     = ball_id,
+                chunk       = chunk,
+                tags        = tags,
+                timeout     = timeout,
+                max_tries   = max_tries,
+                max_backoff = max_backoff
             )
+
             L.debug({
                 "event":"DELETE.COMPLETED",
                 "bucket_id":bucket_id,
@@ -980,7 +1019,6 @@ class Common:
                 h = H.sha256()
                 async for (m,data) in x_result:
                     data_bytes = data.tobytes()
-                    print("DB",data_bytes)
                     ms.append(m)
                     shape = eval(m.tags.get("shape"))
                     dtype = m.tags.get("dtype","float64")
@@ -1006,7 +1044,42 @@ class Common:
                         return np.concatenate(ordered_chunks, axis=0)
         except Exception as e:
             raise e
-        
+    
+    @staticmethod
+    async def get_and_merge_safe(
+             client:AsyncClient,
+        key:str,
+        bucket_id:str="rory",
+        max_retries:int = 5,
+        delay:float = 1,
+        backoff_factor:float =.5,
+        max_paralell_gets:int = 10, 
+        force:bool = False,
+        timeout:int = 120,
+        chunk_size:str="256kb",
+        headers:Dict[str,str] ={},
+        http2:bool = False,
+        chunk_index:int = 0,
+    ):
+        try:
+            matrix = await Common.get_and_merge(
+                client = client,
+                key = key,
+                bucket_id = bucket_id,
+                max_retries = max_retries,
+                delay = delay,
+                backoff_factor = backoff_factor,
+                max_paralell_gets = max_paralell_gets,
+                force = force,
+                timeout = timeout,
+                chunk_size = chunk_size,
+                headers = headers,
+                http2 = http2,
+                chunk_index = chunk_index
+            )
+            return Ok(matrix)
+        except Exception as e:
+            return Err(e) 
 
   
     @staticmethod
@@ -1095,6 +1168,49 @@ class Common:
             return xx,m
     
         raise Exception(f"Get {bucket_id}@{ball_id} failed: Max tries reached")
+    
+    @staticmethod
+    async def get_pyctxt_chunk(
+        client:AsyncClient,
+        ckks:Ckks,
+        ball_id:str, 
+        bucket_id:str,
+        index:int,
+        max_retries:int = 5,
+        delay:float = 1,
+        backoff_factor:float =.5,
+        max_paralell_gets:int = 10, 
+        force:bool = False,
+        timeout:int = 120,
+        chunk_size:str="256kb",
+        headers:Dict[str,str] ={},
+        http2:bool = False,
+        max_backoff:int = 5
+    )->Result[Tuple[List[PyCtxt],InterfaceX.Metadata],Exception]:
+        try:
+            x = await Common.get_pyctxt_chunk_or_error(
+                client = client,
+                ckks   = ckks,
+                ball_id = ball_id,
+                bucket_id = bucket_id,
+                index = index,
+                max_retries = max_retries,
+                delay = delay,
+                backoff_factor = backoff_factor,
+                max_paralell_gets = max_paralell_gets,
+                force = force,
+                timeout = timeout,
+                chunk_size = chunk_size,
+                headers = headers,
+                http2 = http2,
+                max_backoff = max_backoff
+            )
+            return Ok(x)
+        except Exception as e:
+            return Err(e)
+        
+    
+    
     @staticmethod
     async def get_paillier_chunk_or_error(
         client:AsyncClient,
@@ -1303,7 +1419,6 @@ class Common:
     @staticmethod
     def encrypt_chunk_paillier(key:str,dataowner:DataOwnerPHE,chunk:Chunk)-> Chunk:
         ptm = chunk.to_ndarray().unwrap()
-        # print("PTM", len(ptm),dataowner)
         encyrpted_chunk = Common.serialize_matrix_with_pickle(dataowner.paillier_encrypt_matrix_chunk(plaintext_matrix = ptm))
         # return Chunk.from_bytes()
         # print("HERE!", encyrpted_chunk.shape,encyrpted_chunk.dtype)
