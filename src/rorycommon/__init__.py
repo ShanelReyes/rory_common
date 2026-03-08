@@ -34,6 +34,9 @@ L = Log(
 
 
 class Common:
+    """
+    Common utility functions for encryption and chunk management.
+    """
     @staticmethod
     async def encrypt_and_put_chunk(
         client:AsyncClient,
@@ -47,35 +50,52 @@ class Common:
         max_backoff:int= 5, 
         max_attempts:int = 10,
         timeout:int=120
-    ):      
-            res = dataowner.liu_encrypt_matrix_chunk(ndarray)
-            m = res.shape[2]
-            new_full_shape = (full_shape[0],full_shape[1], m)
-            new_c = Chunk.from_ndarray(
-                group_id=ball_id,
-                index=index,
-                ndarray=res,
-                metadata={
-                    "full_shape":str(new_full_shape),
-                    "dtype":str(res.dtype),
-                    "shape":str(res.shape),
-                    "num_chunks":str(num_chunks)
-                }, 
-                chunk_id=Some(f"{ball_id}_{index}")
-            )
-            res_dp_chunk = await Common.delete_and_put_chunk(
-                client      = client,
-                bucket_id   = bucket_id,
-                ball_id     = ball_id,
-                chunk       = new_c,
-                tags        = {},
-                max_backoff = max_backoff,
-                max_tries   = max_attempts,
-                timeout     = timeout
-            )
-            if res_dp_chunk.is_err:
-                return res_dp_chunk
+    ):
+        """
+        Encrypts a chunk of data using the provided data owner and puts it into the storage system.
+
+        Arguments:
+            client (AsyncClient): The asynchronous client to interact with the storage system.
+            bucket_id (str): The ID of the bucket where the chunk will be stored.
+            ball_id (str): The ID of the ball to which the chunk belongs.
+            index (int): The index of the chunk within the ball.
+            dataowner (DataOwner): The data owner responsible for encrypting the chunk.
+            ndarray (npt.NDArray): The NumPy array representing the chunk data.
+            full_shape (Tuple[int, int]): The full shape of the original data.
+            num_chunks (int): The total number of chunks.
+            max_backoff (int, optional): The maximum backoff time for retries. Defaults to 5.
+            max_attempts (int, optional): The maximum number of attempts for retries. Defaults to 10.
+            timeout (int, optional): The timeout for the operation in seconds. Defaults to 120.
+
+        """ 
+        res = dataowner.liu_encrypt_matrix_chunk(ndarray)
+        m = res.shape[2]
+        new_full_shape = (full_shape[0],full_shape[1], m)
+        new_c = Chunk.from_ndarray(
+            group_id=ball_id,
+            index=index,
+            ndarray=res,
+            metadata={
+                "full_shape":str(new_full_shape),
+                "dtype":str(res.dtype),
+                "shape":str(res.shape),
+                "num_chunks":str(num_chunks)
+            }, 
+            chunk_id=Some(f"{ball_id}_{index}")
+        )
+        res_dp_chunk = await Common.delete_and_put_chunk(
+            client      = client,
+            bucket_id   = bucket_id,
+            ball_id     = ball_id,
+            chunk       = new_c,
+            tags        = {},
+            max_backoff = max_backoff,
+            max_tries   = max_attempts,
+            timeout     = timeout
+        )
+        if res_dp_chunk.is_err:
             return res_dp_chunk
+        return res_dp_chunk
                 # print("FAILED TO PUT", new_c.chunk_id)
     @staticmethod
     async def encrypt_ckks_and_put_chunk(
@@ -713,7 +733,6 @@ class Common:
         i = 0
         while  i < max_tries: 
             _delete_result = await Common.while_not_delete_key(client = client, bucket_id = bucket_id, key = chunk.chunk_id,timeout=timeout,max_tries=max_tries)
-            print("DELETE_RESULT", _delete_result)
             
             put_res = await client.put_single_chunk(
                 bucket_id   = bucket_id,
@@ -1000,7 +1019,6 @@ class Common:
                 h = H.sha256()
                 async for (m,data) in x_result:
                     data_bytes = data.tobytes()
-                    print("DB",data_bytes)
                     ms.append(m)
                     shape = eval(m.tags.get("shape"))
                     dtype = m.tags.get("dtype","float64")
@@ -1401,7 +1419,6 @@ class Common:
     @staticmethod
     def encrypt_chunk_paillier(key:str,dataowner:DataOwnerPHE,chunk:Chunk)-> Chunk:
         ptm = chunk.to_ndarray().unwrap()
-        # print("PTM", len(ptm),dataowner)
         encyrpted_chunk = Common.serialize_matrix_with_pickle(dataowner.paillier_encrypt_matrix_chunk(plaintext_matrix = ptm))
         # return Chunk.from_bytes()
         # print("HERE!", encyrpted_chunk.shape,encyrpted_chunk.dtype)

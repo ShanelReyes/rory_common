@@ -1,16 +1,13 @@
 import pytest
-from rorycommon import Common as RoryCommon
-import os 
 import numpy as np
-from mictlanx import AsyncClient
-from mictlanx.utils import Utils
+from rorycommon import Common as RoryCommon
 from concurrent.futures import ProcessPoolExecutor
 from rory.core.security.dataowner import DataOwner
 from rory.core.security.pqc.dataowner import DataOwner as RataOwnerPQC
-
 from rory.core.security.cryptosystem.liu import Liu
-from xolo.utils.utils import Utils as XoloUtils
 from rory.core.security.cryptosystem.pqc.ckks import Ckks
+
+
 dataowner = DataOwner(
     liu_scheme= Liu(
         _round         = True,
@@ -21,6 +18,15 @@ dataowner = DataOwner(
         security_level = 128
     ),
 )
+_ = Ckks.create_client(
+    scheme      = "CKKS",
+    decimals=2,
+    enable_relinearize=True,
+    security_level=128,
+    save        = True,
+    output_path = "/rory/keys"
+)
+
 ckks = Ckks.from_pyfhel(
     _round             = True,
     decimals           = 2,
@@ -42,28 +48,30 @@ bucket_id = "rory"
 
 
 
-@pytest.mark.skip("")
+# @pytest.mark.skip("")
 @pytest.mark.asyncio
 async def test_liu():
-    pmt = await RoryCommon.read_numpy_from(
-        path="/rory/source/clusteringc0r10a5k20.npy",
-        extension="npy"
-    )
-    pmt = pmt.unwrap()
+    # pmt = await RoryCommon.read_numpy_from(
+    #     path="/rory/source/clusteringc0r10a5k20.npy",
+    #     extension="npy"
+    # )
+    # pmt = pmt.unwrap()
+    pmt = np.random.random(size=(10, 10))
     # print(pmt.dtype)
     # np.random.seed(10)
 
     n = pmt.shape[0]*pmt.shape[1]*dataowner.m
     num_chunks = 2
     emt = RoryCommon.segment_and_encrypt_liu_with_executor(
-        executor= ProcessPoolExecutor(max_workers=num_chunks),
-        dataowner=dataowner,
-        key=key,
-        n=n,
-        np_random=True,
-        num_chunks=num_chunks,
-        plaintext_matrix=pmt
+        executor         = ProcessPoolExecutor(max_workers=num_chunks),
+        dataowner        = dataowner,
+        key              = key,
+        n                = n,
+        np_random        = True,
+        num_chunks       = num_chunks,
+        plaintext_matrix = pmt
     )
+    assert len(emt) == num_chunks
 
     
 

@@ -18,6 +18,7 @@ pytest = ">=8.4.1,<9.0.0"
 mictlanx = "0.1.0a5"
 phe = "^1.5.0"
 pyfhel = "3.5.0"
+python-dotenv = "^1.2.2"
 
 
 
@@ -32,6 +33,9 @@ ipykernel = "^6.29.5"
 pytest = "^8.4.1"
 seaborn = "^0.13.2"
 scikit-learn = "^1.7.0"
+zensical = "^0.0.24"
+mkdocstrings-python = "^2.0.3"
+coverage = "^7.13.4"
 
 
 [build-system]

@@ -30,17 +30,22 @@ MICTLANX_DISABLED_LOG        = bool(int(os.environ.get("MICTLANX_DISABLED_LOG",0
 MICTLANX_MAX_WORKERS         = int(os.environ.get("MICTLANX_MAX_WORKERS","12"))
 MICTLANX_CLIENT_LB_ALGORITHM = os.environ.get("MICTLANX_CLIENT_LB_ALGORITHM","2CHOICES_UF")
 MICTLANX_BUCKET_ID           = os.environ.get("MICTLANX_BUCKET_ID","rory") 
-MICTLANX_OUTPUT_PATH         = os.environ.get("MICTLANX_OUTPUT_PATH","/rory/mictlanx")
+MICTLANX_PROTOCOL            = os.environ.get("MICTLANX_PROTOCOL","http")
+MICTLANX_URI = os.environ.get("MICTLANX_URI",f"mictlanx://mictlanx-router-0@localhost:63666?api_version={MICTLANX_API_VERSION}&protocol={MICTLANX_PROTOCOL}")
+MICTLANX_DEBUG  = bool(int(os.environ.get("MICTLANX_DEBUG",0)))
+
 
 client = AsyncClient(
-    client_id=MICTLANX_CLIENT_ID,
-    capacity_storage="200mb",
-    debug=True,
-    eviction_policy="LRU",
-    max_workers= MICTLANX_MAX_WORKERS,
-    routers=list(Utils.routers_from_str(routers_str=MICTLANX_ROUTERS,protocol="http")),
-    verify=False
+    uri              = MICTLANX_URI,
+    client_id        = MICTLANX_CLIENT_ID,
+    capacity_storage = "200mb",
+    debug            = MICTLANX_DEBUG,
+    eviction_policy  = "LRU",
+    max_workers      = MICTLANX_MAX_WORKERS,
+    # routers          = list(Utils.routers_from_str(routers_str=MICTLANX_ROUTERS,protocol="http")),
+    verify           = False
 )
+
 
 
 class MiniBatchKMeansCustom:

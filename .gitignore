@@ -2,3 +2,6 @@ dist/
 *.ipynb
 **/__pycache__/
 *.lock
+.coverage
+site/
+htmlcov/
