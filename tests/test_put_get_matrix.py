@@ -1,12 +1,9 @@
 import hashlib as H
-import time as T
-import asyncio
 import pytest
 from rorycommon import Common as RoryCommon
 import os 
 import pickle as PK
 import numpy as np
-from typing import List,Tuple
 from option import Result,Some,NONE
 from mictlanx import AsyncClient
 from mictlanx.utils import Utils
@@ -15,19 +12,16 @@ from concurrent.futures import ProcessPoolExecutor
 from rory.core.security.dataowner import DataOwner
 from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
 from rory.core.security.cryptosystem.liu import Liu
-from Pyfhel import PyCtxt
 from rory.core.utils.constants import Constants
-import numpy.typing as npt
 from xolo.utils.utils import Utils as XoloUtils
 from rory.core.security.cryptosystem.pqc.ckks import Ckks
 from rory.core.clustering.secure.pqc.skmeans import Skmeans as SkmeansPQC
-from rory.core.classification.secure.pqc.sknn import SecureKNearestNeighbors as SKNNPQC
+
 
 
 MICTLANX_CLIENT_ID           = os.environ.get("MICTLANX_CLIENT_ID","{}_mictlanx".format("rory-common"))
 MICTLANX_TIMEOUT             = int(os.environ.get("MICTLANX_TIMEOUT",3600))
 MICTLANX_API_VERSION         = int(os.environ.get("MICTLANX_API_VERSION","3"))
-MICTLANX_ROUTERS             = os.environ.get("MICTLANX_ROUTERS", "mictlanx-router-0:localhost:60666") #mictlanx-peer-2:localhost:7002")
 MICTLANX_DEBUG               = bool(int(os.environ.get("MICTLANX_DEBUG",0)))
 MICTLANX_DAEMON              = bool(int(os.environ.get("MICTLANX_DAEMON",1)))
 MICTLANX_SHOW_METRICS        = bool(int(os.environ.get("MICTLANX_SHOW_METRICS",0)))
@@ -36,15 +30,19 @@ MICTLANX_MAX_WORKERS         = int(os.environ.get("MICTLANX_MAX_WORKERS","12"))
 MICTLANX_CLIENT_LB_ALGORITHM = os.environ.get("MICTLANX_CLIENT_LB_ALGORITHM","2CHOICES_UF")
 MICTLANX_BUCKET_ID           = os.environ.get("MICTLANX_BUCKET_ID","rory") 
 MICTLANX_OUTPUT_PATH         = os.environ.get("MICTLANX_OUTPUT_PATH","/rory/mictlanx")
+MICTLANX_PROTOCOL            = os.environ.get("MICTLANX_PROTOCOL","http")
+MICTLANX_URI = os.environ.get("MICTLANX_URI",f"mictlanx://mictlanx-router-0@localhost:63666?api_version={MICTLANX_API_VERSION}&protocol={MICTLANX_PROTOCOL}")
+MICTLANX_DEBUG  = bool(int(os.environ.get("MICTLANX_DEBUG",0)))
 
 client = AsyncClient(
-    client_id=MICTLANX_CLIENT_ID,
-    capacity_storage="200mb",
-    debug=False,
-    eviction_policy="LRU",
-    max_workers= MICTLANX_MAX_WORKERS,
-    routers=list(Utils.routers_from_str(routers_str=MICTLANX_ROUTERS,protocol="http")),
-    verify=False
+    uri              = MICTLANX_URI,
+    client_id        = MICTLANX_CLIENT_ID,
+    capacity_storage = "200mb",
+    debug            = MICTLANX_DEBUG,
+    eviction_policy  = "LRU",
+    max_workers      = MICTLANX_MAX_WORKERS,
+    # routers          = list(Utils.routers_from_str(routers_str=MICTLANX_ROUTERS,protocol="http")),
+    verify           = False
 )
 dataowner = DataOwner(
     liu_scheme= Liu(
@@ -62,7 +60,7 @@ key = "encryptedskmeanspqc1"
 bucket_id = "rory"
 
 ckks = Ckks.from_pyfhel(
-    path="/rory/keys",
+    path="/rory/keys/128",
 )
 
 
@@ -79,64 +77,67 @@ bucket_id = "rory"
 # @pytest.mark.skip("")
 @pytest.mark.asyncio
 async def test_get_encrypt_ckks_matrix_chunk():
-    res = await RoryCommon.get_pyctxt_chunk_or_error(
-        client= client,
-        ckks= dataowner_pqc.scheme,
-        ball_id="x",
-        bucket_id = "rory",
-        index = 0
+    bucket_id = "rory"
+    ball_id   = "x"
+    res = await RoryCommon.encrypt_ckks_and_put_chunk(
+        client       = client,
+        ball_id      = ball_id,
+        bucket_id    = bucket_id,
+        dataowner    = dataowner_pqc,
+        index        = 0,
+        full_shape   = (100,10),
+        max_attempts = 5,
+        ndarray      = np.random.rand(100,10),
+        num_chunks   = 1,
+        max_backoff  = 5,
+        timeout      = 120
+
     )
-    print(res)
+    assert res.is_ok, "Failed to encrypt and put chunk: {}".format(res.unwrap_err())
 
-@pytest.mark.skip("")
-@pytest.mark.asyncio
-async def test_encrypt_ckks_matrix_chunk():
-    g = RoryCommon.iterate_matrix_chunks(client=client, ball_id="bxx",bucket_id="rory")
-    async for (index,m, ndarray) in g:
-        res = await RoryCommon.encrypt_ckks_and_put_chunk(
-            ball_id    = "x",
-            bucket_id  = "rory",
-            client     = client,
-            index      = index,
-            dataowner  = dataowner_pqc,
-            full_shape = eval(m.tags.get("full_shape","(1000,10)")),
-            ndarray    = ndarray,
-            num_chunks = int(m.tags.get("num_chunks","0"))
-        )
-        print(res)
+    res = await RoryCommon.get_pyctxt_chunk(
+        client    = client,
+        ckks      = dataowner_pqc.scheme,
+        ball_id   = ball_id,
+        bucket_id = bucket_id,
+        index     = 0
+    )
+    assert res.is_ok, "Failed to get chunk: {}".format(res.unwrap_err())
 
 
 
 
-@pytest.mark.skip("")
 @pytest.mark.asyncio
 async def test_put_chunks():
-    pmt = await RoryCommon.read_numpy_from(
-        path="/rory/source/clusteringc0r10a5k20.npy",
+
+    test_numpy_array = np.random.rand(100,10)
+    np.save("/rory/source/test_array.npy", test_numpy_array)
+
+    pmt_result = await RoryCommon.read_numpy_from(
+        path="/rory/source/test_array.npy",
         extension="npy"
     )
-    pmt = pmt.unwrap()
-    # print(pmt.dtype)
-    # np.random.seed(10)
+    assert pmt_result.is_ok, "Failed to read numpy array: {}".format(pmt_result.unwrap_err())
+    pmt = pmt_result.unwrap()
 
     n = pmt.shape[0]*pmt.shape[1]*dataowner.m
     num_chunks = 2
     emt = RoryCommon.segment_and_encrypt_liu_with_executor(
-        executor= ProcessPoolExecutor(max_workers=num_chunks),
-        dataowner=dataowner,
-        key=key,
-        n=n,
-        np_random=True,
-        num_chunks=num_chunks,
-        plaintext_matrix=pmt
+        executor         = ProcessPoolExecutor(max_workers=num_chunks),
+        dataowner        = dataowner,
+        key              = key,
+        n                = n,
+        np_random        = True,
+        num_chunks       = num_chunks,
+        plaintext_matrix = pmt
     )
     # emt.sort()
     for c in emt:
         print(c.chunk_id,c.checksum,c.to_ndarray())
-    checksum,_ = XoloUtils.sha256_stream(emt.to_generator())
-    checksum1= XoloUtils.sha256(emt.to_bytes())
-    print("FULL_H1",checksum)
-    print("FULL_H2",checksum1)
+    # checksum,_ = XoloUtils.sha256_stream(emt.to_generator())
+    # checksum1= XoloUtils.sha256(emt.to_bytes())
+
+
     put_res = await RoryCommon.put_chunks(
         client=client,
         key=key,
@@ -147,54 +148,60 @@ async def test_put_chunks():
             "full_dtype":str(pmt.dtype)
         }
     ) 
-    print(put_res)
+    assert put_res.is_ok, "Failed to put chunks: {}".format(put_res.unwrap_err())
 
-    
-
-@pytest.mark.skip("")
-@pytest.mark.asyncio
-async def test_get_and_merge():
-    # key = "encryptedskmeansy"
-    # bucket_id = "rory"
-    x = await RoryCommon.get_and_merge(
-        client = client, 
-        key = key, 
+    get_res = await RoryCommon.get_and_merge_safe(
+        client = client,
+        key = key,
         bucket_id = bucket_id
     )
+    assert get_res.is_ok, "Failed to get and merge chunks: {}".format(get_res.unwrap_err())
+    merged_array = get_res.unwrap()
+    assert merged_array.shape == (pmt.shape[0],pmt.shape[1],dataowner.m), "Merged array shape mismatch: expected {}, got {}".format((pmt.shape[0],pmt.shape[1],dataowner.m), merged_array.shape)
 
 
 
-@pytest.mark.skip("")
 @pytest.mark.asyncio
 async def test_put_pqx():
+    bucket_id = "rory"
+    key       = "encryptedput_pqx"
+    test_numpy_array = np.random.rand(100,10)
+    np.save("/rory/source/test_array.npy", test_numpy_array)
+
     pmt_result = await RoryCommon.read_numpy_from(
-        path="/rory/source/clusteringc0r10a5k20.npy",
+        path="/rory/source/test_array.npy",
         extension="npy"
     )
-    assert pmt_result.is_ok
-    pmt = pmt_result.unwrap()
-
-    print(pmt)
+    assert pmt_result.is_ok, "Failed to read numpy array: {}".format(pmt_result.unwrap_err())
+    pmt        = pmt_result.unwrap()
     n          = pmt.shape[1]*pmt.shape[1]
     num_chunks = 2
-    key = "xxx"
+
     emt = RoryCommon.segment_and_encrypt_ckks_with_executor(
-        executor         = ProcessPoolExecutor(max_workers=num_chunks),
-        key              = key,
-        plaintext_matrix = pmt,
-        n                = n,
-        num_chunks       = num_chunks,
-        _round = False,
-        ctx_filename="ctx", 
-        pubkey_filename="pubkey",
-        secretkey_filename="secretkey",
-        path="/rory/keys",
-        decimals=2
+        executor           = ProcessPoolExecutor(max_workers=num_chunks),
+        key                = key,
+        plaintext_matrix   = pmt,
+        n                  = n,
+        num_chunks         = num_chunks,
+        _round             = False,
+        ctx_filename       = "ctx",
+        pubkey_filename    = "pubkey",
+        secretkey_filename = "secretkey",
+        path               = "/rory/keys/128",
+        decimals           = 2
     ) 
-    res = await RoryCommon.delete_and_put_chunks(client=client, bucket_id=bucket_id,key="xxx", chunks=emt, tags={
-        "x":"Something_test"
-    })
-    assert res.is_ok
+
+    res = await RoryCommon.delete_and_put_chunks(
+        client    = client,
+        bucket_id = bucket_id,
+        key       = key,
+        chunks    = emt,
+        tags      = {
+            "x": "Something_test"
+        }
+    )
+    
+    assert res.is_ok, "Failed to delete and put chunks: {}".format(res.unwrap_err())
 
 @pytest.mark.skip("")
 @pytest.mark.asyncio

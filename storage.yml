@@ -4,8 +4,8 @@ services:
       - SYS_PTRACE
     image: ${MICTLANX_ROUTER_IMAGE:-nachocode/mictlanx:router-0.1.0a5}
     restart: unless-stopped
-    # env_file:
-      # - .env.mictlanx.dev
+    env_file:
+      - .env.mictlanx.dev
     networks:
       - mictlanx
     ports:

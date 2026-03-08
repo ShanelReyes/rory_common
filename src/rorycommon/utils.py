@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Tuple,Iterator,Optional
+from typing import Iterator,Optional
 from mictlanx.utils.segmentation import Chunk
 from option import Some
 import hashlib as H

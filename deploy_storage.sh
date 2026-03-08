@@ -22,11 +22,12 @@ docker compose -p mictlanx --env-file $ENV_FILE -f storage.yml up -d
 # Healthcheck: wait for peers
 # -------------------------------
 API="http://localhost:${MICTLANX_ROUTER_PORT}/api/v4/peers/stats"
-DEADLINE=$((SECONDS + 180))   # timeout after 180s; adjust as needed
+TIMEOUT=180
+DEADLINE=$((SECONDS + TIMEOUT))   # timeout after 180s; adjust as needed
 
 echo "Waiting for peers to appear at $API ..."
+sleep 5  # initial delay before first check; adjust as needed
 
-sleep 5
 while true; do
   # fetch JSON (fail on non-2xx; quiet errors to stderr)
   if json="$(curl -fsS "$API")"; then
@@ -46,6 +47,6 @@ while true; do
     echo "❌ Timed out waiting for peers at $API"
     exit 1
   fi
-
-  sleep 2
+  sleep 1
+  
 done

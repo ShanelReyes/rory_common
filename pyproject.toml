@@ -15,7 +15,7 @@ pandas = ">=2.2.3,<3.0.0"
 numpy = ">=2.2.4"
 rory = "0.0.222"
 pytest = ">=8.4.1,<9.0.0"
-mictlanx = "0.0.162"
+mictlanx = "0.1.0a5"
 phe = "^1.5.0"
 pyfhel = "3.5.0"
 
