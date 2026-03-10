@@ -1,18 +1,14 @@
 name: Run Unit Test via Pytest  
 on:
-  push: 
-    branches: ["*"]
   pull_request:
-    branches: ["*"]
-    paths:
-      - "src/rorycommon/**"
-      - "tests/**"
-      - "pyproject.toml"
+    branches: ["master"]
 jobs:  
   build:  
     runs-on: ubuntu-latest  
     env:
       RORY_COMMON_LOG_PATH: ${{ github.workspace }}/log
+      MICTLANX_LOG_PATH: ${{ github.workspace }}/log
+      RORY_COMMON_KEY_PATH: ${{ github.workspace }}/keys
     strategy:  
       matrix:  
         python-version: ["3.11"]  
