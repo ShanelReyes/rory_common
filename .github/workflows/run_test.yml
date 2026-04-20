@@ -1,7 +1,10 @@
 name: Run Unit Test via Pytest  
 on:
-  pull_request:
+  push:
     branches: ["master"]
+  pull_request:
+    branches: ["master"]  # Triggers when a PR is opened AGAINST master
+  workflow_dispatch:      # Allows you to run it manually for testing
 jobs:  
   build:  
     runs-on: ubuntu-latest  
