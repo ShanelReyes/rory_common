@@ -3,7 +3,7 @@ import numpy as np
 from rorycommon import Common as RoryCommon
 from concurrent.futures import ProcessPoolExecutor
 from rory.core.security.dataowner import DataOwner
-from rory.core.security.pqc.dataowner import DataOwner as RataOwnerPQC
+from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
 from rory.core.security.cryptosystem.liu import Liu
 from rory.core.security.cryptosystem.pqc.ckks import Ckks
 
@@ -36,7 +36,7 @@ ckks = Ckks.from_pyfhel(
     # secretkey_filename = secretkey_filename,
     # relinkey_filename  = relinkey_filename,
 ) 
-dataowner_pqc = RataOwnerPQC(
+dataowner_pqc = DataOwnerPQC(
     scheme=ckks,
     securitylevel=128
 
