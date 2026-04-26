@@ -1,3 +1,4 @@
+import os
 import pytest
 import numpy as np
 from rorycommon import Common as RoryCommon
@@ -18,19 +19,21 @@ dataowner = DataOwner(
         security_level = 128
     ),
 )
+RORY_KEYS_PATH = os.environ.get("RORY_KEYS_PATH", "/rory/keys")
+RORY_SOURCE_PATH = os.environ.get("RORY_SOURCE_PATH", "/rory/source")
 _ = Ckks.create_client(
     scheme      = "CKKS",
     decimals=2,
     enable_relinearize=True,
     security_level=128,
     save        = True,
-    output_path = "/rory/keys"
+    output_path = RORY_KEYS_PATH
 )
 
 ckks = Ckks.from_pyfhel(
     _round             = True,
     decimals           = 2,
-    path               = "/rory/keys",
+    path               = RORY_KEYS_PATH,
     # ctx_filename       = ctx_filename,
     # pubkey_filename    = pubkey_filename,
     # secretkey_filename = secretkey_filename,
@@ -81,7 +84,7 @@ async def test_liu():
 @pytest.mark.asyncio
 async def test_fdhope():
     pmt_result = await RoryCommon.read_numpy_from(
-        path="/rory/source/clusteringc0r10a5k20.npy",
+        path=os.path.join(RORY_SOURCE_PATH, "clusteringc0r10a5k20.npy"),
         extension="npy"
     )
     pmt = pmt_result.unwrap()
@@ -120,7 +123,7 @@ async def test_generate_ckks_keys():
         qi_sizes=[60,40,40,60],
         decimals=2,
         save=True,
-        output_path="/rory/keys"
+        output_path=RORY_KEYS_PATH
 
     )
     x.he_object.res
@@ -129,7 +132,7 @@ async def test_generate_ckks_keys():
 @pytest.mark.asyncio
 async def test_ckks():
     pmt_result = await RoryCommon.read_numpy_from(
-        path="/rory/source/clusteringc0r10a5k20.npy",
+        path=os.path.join(RORY_SOURCE_PATH, "clusteringc0r10a5k20.npy"),
         extension="npy"
     )
     assert pmt_result.is_ok
@@ -147,7 +150,7 @@ async def test_ckks():
         ctx_filename="ctx", 
         pubkey_filename="pubkey",
         secretkey_filename="secretkey",
-        path="/rory/keys",
+        path=RORY_KEYS_PATH,
         decimals=2
     )
     for c in emt:

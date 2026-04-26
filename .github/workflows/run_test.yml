@@ -11,7 +11,8 @@ jobs:
     env:
       RORY_COMMON_LOG_PATH: ${{ github.workspace }}/log
       MICTLANX_LOG_PATH: ${{ github.workspace }}/log
-      RORY_COMMON_KEY_PATH: ${{ github.workspace }}/keys
+      RORY_KEYS_PATH: ${{ github.workspace }}/keys
+      RORY_SOURCE_PATH: ${{ github.workspace }}/source
     strategy:  
       matrix:  
         python-version: ["3.11"]  
@@ -26,6 +27,9 @@ jobs:
       - name: Prepare log folder
         run: |
           mkdir -p "${RORY_COMMON_LOG_PATH}"
+          mkdir -p "${MICTLANX_LOG_PATH}"
+          mkdir -p "${RORY_KEYS_PATH}"
+          mkdir -p "${RORY_SOURCE_PATH}"
       - name: Start MictlanX Service
         run: |
           chmod +x deploy_storage.sh && ./deploy_storage.sh

@@ -29,7 +29,7 @@ MICTLANX_OUTPUT_PATH           = os.environ.get("MICTLANX_OUTPUT_PATH","/rory/mi
 MICTLANX_PROTOCOL              = os.environ.get("MICTLANX_PROTOCOL","http")
 MICTLANX_URI                   = os.environ.get("MICTLANX_URI",f"mictlanx://mictlanx-router-0@localhost:63666?api_version={MICTLANX_API_VERSION}&protocol={MICTLANX_PROTOCOL}")
 MICTLANX_DEBUG                 = bool(int(os.environ.get("MICTLANX_DEBUG",0)))
-RORY_COMMON_KEY_PATH           = os.environ.get("RORY_COMMON_KEY_PATH","/rory/keys")
+RORY_KEYS_PATH                 = os.environ.get("RORY_KEYS_PATH","/rory/keys")
 RORY_COMMON_CTX_FILENAME       = os.environ.get("RORY_COMMON_CTX_FILENAME","ctx")
 RORY_COMMON_PUBKEY_FILENAME    = os.environ.get("RORY_COMMON_PUBKEY_FILENAME","pubkey")
 RORY_COMMON_SECRETKEY_FILENAME = os.environ.get("RORY_COMMON_SECRETKEY_FILENAME","secretkey")
@@ -55,10 +55,10 @@ def ckks():
         enable_relinearize = True,
         security_level     = 128,
         save               = True,
-        output_path        = RORY_COMMON_KEY_PATH
+        output_path        = RORY_KEYS_PATH
     )
     ckks = Ckks.from_pyfhel(
-        path=RORY_COMMON_KEY_PATH,
+        path=RORY_KEYS_PATH,
     )
     return ckks
 
@@ -191,7 +191,7 @@ async def test_put_get_pqx(ckks, client,matrix):
         ctx_filename       = RORY_COMMON_CTX_FILENAME,
         pubkey_filename    = RORY_COMMON_PUBKEY_FILENAME,
         secretkey_filename = RORY_COMMON_SECRETKEY_FILENAME,
-        path               = RORY_COMMON_KEY_PATH,
+        path               = RORY_KEYS_PATH,
         decimals           = 2
     ) 
     assert len(emt) == num_chunks
@@ -240,7 +240,7 @@ async def test_full_skmeans_pqc(dataowner_pqc, client,matrix,ckks):
         n                  = n,
         _round             = _round,
         decimals           = decimals,
-        path               = RORY_COMMON_KEY_PATH,
+        path               = RORY_KEYS_PATH,
         ctx_filename       = RORY_COMMON_CTX_FILENAME,
         pubkey_filename    = RORY_COMMON_PUBKEY_FILENAME,
         secretkey_filename = RORY_COMMON_SECRETKEY_FILENAME,
@@ -269,7 +269,7 @@ async def test_full_skmeans_pqc(dataowner_pqc, client,matrix,ckks):
         num_chunks         = num_chunks,
         _round             = _round,
         decimals           = decimals,
-        path               = RORY_COMMON_KEY_PATH,
+        path               = RORY_KEYS_PATH,
         ctx_filename       = RORY_COMMON_CTX_FILENAME,
         pubkey_filename    = RORY_COMMON_PUBKEY_FILENAME,
         secretkey_filename = RORY_COMMON_SECRETKEY_FILENAME
