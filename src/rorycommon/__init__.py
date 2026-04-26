@@ -470,7 +470,8 @@ class Common:
         pubkey_filename:str,
         secretkey_filename:str,
         num_chunks:int=2,
-        relinkey_filename:str=""
+        relinkey_filename:str="",
+        rotatekey_filename:str=""
     ):
         plaintext_matrix_chunks = Chunks.from_ndarray( ndarray = plaintext_matrix, group_id = key, num_chunks = num_chunks).unwrap()
         awaitable_chunks:List[Awaitable[Chunk]] = []
@@ -486,13 +487,14 @@ class Common:
                 pubkey_filename    = pubkey_filename,
                 secretkey_filename = secretkey_filename,
                 relinkey_filename  = relinkey_filename,
+                rotatekey_filename =  rotatekey_filename,
             )
             awaitable_chunks.append(future)
         return Chunks(chs= Common.to_chunks_generator(awaitable_chunks=awaitable_chunks),n =n)
     
 
     @staticmethod
-    def encrypt_chunk_ckks(key:str, chunk:Chunk, _round:bool, decimals:int, path:str, ctx_filename:str, pubkey_filename:str, secretkey_filename:str, relinkey_filename:str)-> Chunk:
+    def encrypt_chunk_ckks(key:str, chunk:Chunk, _round:bool, decimals:int, path:str, ctx_filename:str, pubkey_filename:str, secretkey_filename:str, relinkey_filename:str = "", rotatekey_filename:str = "")-> Chunk:
         try:
             dataowner = DataOwnerPQC(
                 scheme= Ckks.from_pyfhel(
@@ -503,6 +505,8 @@ class Common:
                     pubkey_filename    = pubkey_filename,
                     secretkey_filename = secretkey_filename,
                     relinkey_filename  = relinkey_filename,
+                    rotatekey_filename =  rotatekey_filename 
+
                 ) 
             )
             plaintext_matrix = chunk.to_ndarray().unwrap().copy()
@@ -527,7 +531,8 @@ class Common:
         pubkey_filename:str, 
         secretkey_filename:str,
         num_chunks:int=2, 
-        relinkey_filename:str=""
+        relinkey_filename:str="",
+        rotatekey_filename:str=""
     ):
         plaintext_matrix_chunks = Chunks.from_ndarray(ndarray = plaintext_matrix, group_id = key, num_chunks = num_chunks).unwrap()
         awaitable_chunks:List[Awaitable[Chunk]] = []
@@ -543,6 +548,7 @@ class Common:
                 pubkey_filename    = pubkey_filename,
                 secretkey_filename = secretkey_filename,
                 relinkey_filename  = relinkey_filename,
+                rotatekey_filename = rotatekey_filename
             )
             awaitable_chunks.append(future)
         return Chunks(chs= Common.to_chunks_generator(awaitable_chunks=awaitable_chunks),n =n)
@@ -558,7 +564,8 @@ class Common:
         ctx_filename:str, 
         pubkey_filename:str, 
         secretkey_filename:str, 
-        relinkey_filename:str
+        relinkey_filename:str = "",
+        rotatekey_filename:str = ""
         )-> Chunk:
         try:
             dataowner = DataOwnerPQC(
@@ -570,6 +577,7 @@ class Common:
                     pubkey_filename    = pubkey_filename,
                     secretkey_filename = secretkey_filename,
                     relinkey_filename  = relinkey_filename,
+                    rotatekey_filename = rotatekey_filename
                 ) 
             )
             plaintext_matrix = chunk.to_ndarray().unwrap().copy()
