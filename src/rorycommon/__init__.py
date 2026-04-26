@@ -22,6 +22,7 @@ import hashlib as H
 from mictlanx.logger.log import Log
 
 
+
 DEBUG = bool(int(os.environ.get("RORY_COMMON_DEBUG","1")))
 RORY_COMMON_LOG_PATH = os.environ.get("RORY_COMMON_LOG_PATH","/mictlanx/client")
 L = Log(
@@ -458,6 +459,25 @@ class Common:
 
 
     @staticmethod
+    def encrypt_vector_ckks_with_executor(executor:ProcessPoolExecutor, key:str, vector:npt.NDArray, _round:bool, decimals:int, path:str, ctx_filename:str, pubkey_filename:str, secretkey_filename:str, relinkey_filename:str="", rotatekey_filename:str=""):
+        return Common.segment_and_encrypt_ckks_with_executor(
+            executor           = executor,
+            key                = key,
+            plaintext_matrix   = vector,
+            n                  = 1,
+            _round             = _round,
+            decimals           = decimals,
+            path               = path,
+            ctx_filename       = ctx_filename,
+            pubkey_filename    = pubkey_filename,
+            secretkey_filename = secretkey_filename,
+            num_chunks         = 1,
+            relinkey_filename  = relinkey_filename,
+            rotatekey_filename = rotatekey_filename
+        )
+    
+    
+    @staticmethod
     def segment_and_encrypt_ckks_with_executor(
         executor:ProcessPoolExecutor,
         key:str,
@@ -878,6 +898,54 @@ class Common:
         put_chunks_generator_results = await Common.put_chunks(client = client, bucket_id = bucket_id, key = key, chunks = chunks, tags = tags)
         return put_chunks_generator_results,seg_encrypt_rt,T.time()-t1
     
+
+    @staticmethod
+    async def segment_encrypt_with_vector_ckks_and_put_chunks_with_executor(
+        client: AsyncClient,
+        bucket_id:str,
+        executor:ProcessPoolExecutor, 
+        key:str, 
+        vector:npt.NDArray, 
+        _round:bool,
+        decimals:int,
+        path:str,
+        ctx_filename:str,
+        pubkey_filename:str,
+        secretkey_filename:str,
+        relinkey_filename:str="",
+        rotatekey_filename:str="",
+        tags:Dict[str,str]={},
+        timeout:int =300,
+        max_retries:int =5
+    ) -> Result[InterfaceX.PutChunkedResponse,Exception]:
+        t1     = T.time()
+        
+
+        chunks = Common.encrypt_vector_ckks_with_executor(
+            executor           = executor,
+            key                = key,
+            vector             = vector,
+            _round             = _round,
+            decimals           = decimals,
+            path               = path,
+            ctx_filename       = ctx_filename,
+            pubkey_filename    = pubkey_filename,
+            secretkey_filename = secretkey_filename,
+            relinkey_filename  = relinkey_filename,
+            rotatekey_filename = rotatekey_filename 
+        )
+        put_result = await Common.delete_and_put_chunks(
+            client    = client,
+            bucket_id = bucket_id,
+            key       = key,
+            chunks    = chunks,
+            timeout   = timeout,
+            max_tries= max_retries,
+            tags=tags
+            
+        )
+        return put_result
+      
 
     @staticmethod
     async def put_chunks(client:AsyncClient,key:str,chunks:Chunks,timeout:int=300,max_retries:int=5,tags:Dict[str,str]={},bucket_id:str= "rory"):
