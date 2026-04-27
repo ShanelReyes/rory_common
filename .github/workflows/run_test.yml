@@ -56,7 +56,7 @@ jobs:
         
       - name: Test with pytest  
         run: |  
-          poetry run coverage run -m pytest -c pytest.ini -v -s  
+          poetry run coverage run -m pytest -c tests/pytest.ini -v -s  
       - name: Generate Coverage Report  
         run: |  
           poetry run coverage report -m
