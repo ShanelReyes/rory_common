@@ -129,7 +129,7 @@ async def test_segment_encrypt_with_ckks_put_chunks_with_executor(client:AsyncCl
         relinkey_filename  = RORY_COMMON_RELINKEY_FILENAME,
         rotatekey_filename = RORY_COMMON_ROTATEKEY_FILENAME,
         tags               = {},
-        max_retries=5,
+        max_attempts=5,
         timeout=MICTLANX_TIMEOUT
 
         

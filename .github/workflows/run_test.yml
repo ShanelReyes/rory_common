@@ -4,6 +4,7 @@ on:
     branches: ["master"]
   pull_request:
     branches: ["master"]  # Triggers when a PR is opened AGAINST master
+
   workflow_dispatch:      # Allows you to run it manually for testing
 jobs:  
   build:  
@@ -43,6 +44,10 @@ jobs:
 
       - name: Install Dependencies
         run: poetry install --no-interaction
+      - name: Key Generation
+        run: |
+          poetry add rory --source test
+          poetry run python3 scripts/keygen.py --scheme=CKKS --mode=default --output-path="${RORY_KEYS_PATH}" --security-level=128 --decimals=2 --enable-relinearize --enable-rotate
       - name: Lint with Ruff  
         run: |  
           pip install ruff  
@@ -51,7 +56,7 @@ jobs:
         
       - name: Test with pytest  
         run: |  
-          poetry run coverage run -m pytest  -v -s  
+          poetry run coverage run -m pytest -c tests/pytest.ini -v -s  
       - name: Generate Coverage Report  
         run: |  
           poetry run coverage report -m
