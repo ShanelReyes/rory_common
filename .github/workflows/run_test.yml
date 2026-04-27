@@ -47,7 +47,7 @@ jobs:
       - name: Key Generation
         run: |
           poetry add rory --source test
-          python3 scripts/keygen.py --scheme=CKKS --mode=default --output-path="${RORY_KEYS_PATH}" --security-level=128 --decimals=2 --enable-relinearize --enable-rotate
+          poetry run python3 scripts/keygen.py --scheme=CKKS --mode=default --output-path="${RORY_KEYS_PATH}" --security-level=128 --decimals=2 --enable-relinearize --enable-rotate
       - name: Lint with Ruff  
         run: |  
           pip install ruff  
