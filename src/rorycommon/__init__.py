@@ -38,6 +38,329 @@ class Common:
     """
     Common utility functions for encryption and chunk management.
     """
+    
+    ckks = None 
+    dataowner = None
+
+
+    # Plain text
+    @staticmethod 
+    async def from_matrix_on_disk_to_cloud_storage(
+        path:str,
+        extension:str,
+        client:AsyncClient,
+        bucket_id:str,
+        ball_id:str,
+        tags:Dict[str,str]={},
+        timeout:int=120,
+        max_attempts:int = 5,
+    ):
+        """Reads a matrix from disk and puts it into cloud storage as an ndarray."""
+        try:
+            res = await Common.read_numpy_from(path=path, extension=extension)
+            if res.is_err:
+                print(f"Failed to read matrix from disk: {res.unwrap_err()}")
+                return res
+            plaintext_matrix = res.unwrap()
+            result = await Common.put_ndarray(
+                client      = client,
+                bucket_id   = bucket_id,
+                key         = ball_id,
+                matrix      = plaintext_matrix,
+                tags        = tags,
+                timeout     = timeout,
+                max_retries = max_attempts,
+            )
+            if result.is_err:
+                print(f"Failed to put ndarray from disk to cloud storage: {result.unwrap_err()}")
+                return result
+            return  result
+        except Exception as e:
+            return Err(e)
+    
+    @staticmethod
+    async def from_matrix_to_cloud_storage(
+        plaintext_matrix:npt.NDArray,
+        client:AsyncClient,
+        bucket_id:str,
+        ball_id:str,
+        tags:Dict[str,str]={},
+        timeout:int=120,
+        max_attempts:int = 5,
+    ):
+        try:
+            result = await Common.put_ndarray(
+                client      = client,
+                bucket_id   = bucket_id,
+                key         = ball_id,
+                matrix      = plaintext_matrix,
+                tags        = tags,
+                timeout     = timeout,
+                max_retries = max_attempts,
+            )
+            if result.is_err:
+                print(f"Failed to put ndarray to cloud storage: {result.unwrap_err()}")
+                return Err(result.unwrap_err())
+            return  result
+        except Exception as e:
+            return Err(e)
+
+    @staticmethod
+    async def from_cloud_storage_to_matrix(
+        client:AsyncClient,
+        bucket_id:str,
+        ball_id:str,
+        chunk_index:int = 0,
+        backoff_factor:int = 2,
+        delay:int = 1,
+        max_attempts:int = 5,
+        timeout:int = 120,
+        force:bool = True,
+        max_parallel_gets:int = 10,
+        headers:Dict[str,str] = {},
+        chunk_size:str = "256kb",
+        http2:bool = False,
+    ):
+        try:
+            res = await Common.get_matrix_or_error(
+                client            = client,
+                bucket_id         = bucket_id,
+                key               = ball_id,
+                backoff_factor    = backoff_factor,
+                chunk_index       = chunk_index,
+                chunk_size        = chunk_size,
+                timeout           = timeout,
+                delay             = delay,
+                force             = force,
+                headers           = headers,
+                http2             = http2,
+                max_paralell_gets = max_parallel_gets,
+                max_retries       = max_attempts
+            )
+            # if res.is_err:
+                # print(f"Failed to get matrix from cloud storage: {res.unwrap_err()}")
+                # return res
+            # chunk = res.unwrap()
+            # matrix = chunk.to_ndarray().unwrap()
+            return Ok(res)
+        except Exception as e:
+            # print(e)
+            return Err(e)
+            # return Err(e)
+        
+    # CKKS
+    @staticmethod
+    async def from_matrix_on_disk_to_cloud_storage_ckks(
+        path:str,
+        extension:str,
+        client:AsyncClient,
+        bucket_id:str,
+        ball_id:str,
+        keys_path:str,
+        ctx_filename:str,
+        relinkey_filename:str,
+        rotatekey_filename:str,
+        secretkey_filename:str,
+        decimals:int,
+        num_chunks:int,
+        pubkey_filename:str,
+        tags:Dict[str,str]={},
+        timeout:int=120,
+        max_attempts:int = 5,
+    ):
+        try: 
+            res = await Common.read_numpy_from(path=path, extension=extension)
+            if res.is_err:
+                return Err(res.unwrap_err())
+            plaintext_matrix = res.unwrap()
+            result = await Common.segement_and_encrypt_ckks_with_initialized_executor_put_chunks(
+                ball_id            = ball_id,
+                bucket_id          = bucket_id,
+                client             = client,
+                ctx_filename       = ctx_filename,
+                key                = ball_id,
+                max_retries        = max_attempts,
+                n                  = plaintext_matrix.shape[0]*plaintext_matrix.shape[1],
+                num_chunks         = num_chunks,
+                keys_path=keys_path,
+                pubkey_filename    = pubkey_filename,
+                plaintext_matrix   = plaintext_matrix,
+                relinkey_filename  = relinkey_filename,
+                rotatekey_filename = rotatekey_filename,
+                secretkey_filename = secretkey_filename,
+                tags               = tags,
+                timeout            = timeout,
+                decimals           = decimals,
+            )
+            return result
+        except Exception as e:
+            return Err(e)
+
+    @staticmethod
+    async def from_vector_ondisk_to_cloud_storage_ckks(
+        path:str,
+        extension:str,
+        client:AsyncClient,
+        bucket_id:str,
+        ball_id:str,
+        keys_path:str,
+        ctx_filename:str,
+        relinkey_filename:str,
+        rotatekey_filename:str,
+        secretkey_filename:str,
+        decimals:int,
+        num_chunks:int,
+        pubkey_filename:str,
+        tags:Dict[str,str]={},
+        timeout:int=120,
+        max_attempts:int = 5,    
+        _round:bool = False
+    ):
+        try:
+            res = await Common.read_numpy_from(path=path, extension=extension)
+            if res.is_err:
+                return Err(res.unwrap_err())
+            plaintext_matrix = res.unwrap()
+            result = await Common.segment_encrypt_with_vector_ckks_and_put_chunks_with_initialized_executor(
+                client             = client,
+                bucket_id          = bucket_id,
+                key                = ball_id,
+                vector             = plaintext_matrix,
+                _round             = _round,
+                decimals           = decimals,
+                path               = keys_path,
+                ctx_filename       = ctx_filename,
+                pubkey_filename    = pubkey_filename,
+                secretkey_filename = secretkey_filename,
+                relinkey_filename  = relinkey_filename,
+                rotatekey_filename = rotatekey_filename,
+                max_attempts       = max_attempts,
+                max_workers        = num_chunks,
+                tags               = tags,
+                timeout            = timeout,
+            )
+            return result
+        except Exception as e:
+            return Err(e)
+
+    @staticmethod
+    async def from_matrix_to_cloud_storage_ckks(
+        plaintext_matrix:npt.NDArray,
+        client:AsyncClient,
+        bucket_id:str,
+        ball_id:str,
+        keys_path:str,
+        ctx_filename:str,
+        relinkey_filename:str,
+        rotatekey_filename:str,
+        secretkey_filename:str,
+        decimals:int,
+        num_chunks:int,
+        pubkey_filename:str,
+        tags:Dict[str,str]={},
+        timeout:int=120,
+        max_attempts:int = 5,    
+        _round:bool = False
+    ):
+        try:
+            result = await Common.segement_and_encrypt_ckks_with_initialized_executor_put_chunks(
+                ball_id            = ball_id,
+                bucket_id          = bucket_id,
+                client             = client,
+                ctx_filename       = ctx_filename,
+                key                = ball_id,
+                max_retries        = max_attempts,
+                n                  = plaintext_matrix.shape[0]*plaintext_matrix.shape[1],
+                num_chunks         = num_chunks,
+                keys_path               = keys_path,
+                pubkey_filename    = pubkey_filename,
+                plaintext_matrix   = plaintext_matrix,
+                relinkey_filename  = relinkey_filename,
+                rotatekey_filename = rotatekey_filename,
+                secretkey_filename = secretkey_filename,
+                tags               = tags,
+                timeout            = timeout,
+                decimals           = decimals,
+                _round             = _round
+            )
+            return result
+        except Exception as e:
+            return Err(e)
+
+    
+    @staticmethod
+    async def from_vector_to_cloud_storage_ckks(
+        vector:npt.NDArray,
+        client:AsyncClient,
+        bucket_id:str,
+        ball_id:str,
+        keys_path:str,
+        ctx_filename:str,
+        relinkey_filename:str,
+        rotatekey_filename:str,
+        secretkey_filename:str,
+        decimals:int,
+        num_chunks:int,
+        pubkey_filename:str,
+        tags:Dict[str,str]={},
+        timeout:int=120,
+        max_attempts:int = 5,    
+        _round:bool = False
+    ):
+        try:
+            result = await Common.segment_encrypt_with_vector_ckks_and_put_chunks_with_initialized_executor(
+                client             = client,
+                bucket_id          = bucket_id,
+                key                = ball_id,
+                vector             = vector,
+                _round             = _round,
+                decimals           = decimals,
+                path               = keys_path,
+                ctx_filename       = ctx_filename,
+                pubkey_filename    = pubkey_filename,
+                secretkey_filename = secretkey_filename,
+                relinkey_filename  = relinkey_filename,
+                rotatekey_filename = rotatekey_filename,
+                max_attempts       = max_attempts,
+                max_workers        = num_chunks,
+                tags               = tags,
+                timeout            = timeout,
+            )
+            return result
+        except Exception as e:
+            return Err(e)
+
+    @staticmethod
+    def init_ckks_worker_context(
+        path: str,
+        ctx_filename: str,
+        pubkey_filename: str,
+        secretkey_filename: str,
+        relinkey_filename: str = "",
+        rotatekey_filename: str = "",
+        _round: bool = False,
+        decimals: int = 2
+    ):
+        """Runs once per worker process to load the context into RAM."""
+        try:
+            global ckks 
+            global dataowner
+
+            ckks= Ckks.from_pyfhel(
+                _round             = _round,
+                decimals           = decimals,
+                path               = path,
+                ctx_filename       = ctx_filename,
+                pubkey_filename    = pubkey_filename,
+                secretkey_filename = secretkey_filename,
+                relinkey_filename  = relinkey_filename,
+                rotatekey_filename =  rotatekey_filename 
+            ) 
+            dataowner = DataOwnerPQC(scheme= ckks)
+        except Exception as e:
+            print(f"Failed to initialize CKKS context: {e}")
+            raise e
+
     @staticmethod
     async def encrypt_and_put_chunk(
         client:AsyncClient,
@@ -478,6 +801,86 @@ class Common:
     
     
     @staticmethod
+    def segment_and_encrypt_ckks_with_initialized_executor(
+        key:str, 
+        plaintext_matrix:npt.NDArray,
+        n:int, 
+        _round:bool,
+        decimals:int,
+        path:str,
+        ctx_filename:str,
+        pubkey_filename:str,
+        secretkey_filename:str,
+        num_chunks:int=2,
+        relinkey_filename:str="",
+        rotatekey_filename:str=""
+    ):
+        executor = ProcessPoolExecutor(
+            max_workers = num_chunks,
+            initializer = Common.init_ckks_worker_context,
+            initargs    = (path, ctx_filename, pubkey_filename, secretkey_filename, relinkey_filename, rotatekey_filename, _round, decimals)
+        )   
+        plaintext_matrix_chunks = Chunks.from_ndarray( ndarray = plaintext_matrix, group_id = key, num_chunks = num_chunks).unwrap()
+        awaitable_chunks:List[Awaitable[Chunk]] = []
+        for plaintext_matrix_chunk in plaintext_matrix_chunks.iter():
+            future = executor.submit(
+                Common.encrypt_chunk_ckks_with_initialized_executor,
+                    key      = key,
+                    chunk    = plaintext_matrix_chunk,
+                )
+            awaitable_chunks.append(future)
+        return Chunks(chs= Common.to_chunks_generator(awaitable_chunks=awaitable_chunks),n =n)
+    
+    @staticmethod
+    async def segement_and_encrypt_ckks_with_initialized_executor_put_chunks(
+        client:AsyncClient,
+        bucket_id:str,
+        ball_id:str,
+        key:str, 
+        plaintext_matrix:npt.NDArray,
+        keys_path:str,
+        ctx_filename:str,
+        pubkey_filename:str,
+        secretkey_filename:str,
+        n:int, 
+        _round:bool= False,
+        num_chunks:int = 2, 
+        decimals:int = 2,
+        relinkey_filename:str="",
+        rotatekey_filename:str="",
+        timeout:int = 120,
+        max_retries:int = 5,
+        tags:Dict[str,str] = {}
+    ):
+        encrypted_chunks = Common.segment_and_encrypt_ckks_with_initialized_executor(
+            key                = key,
+            plaintext_matrix   = plaintext_matrix,
+            n                  = n,
+            _round             = _round,
+            decimals           = decimals,
+            path               = keys_path,
+            ctx_filename       = ctx_filename,
+            pubkey_filename    = pubkey_filename, 
+            num_chunks         = num_chunks,
+            relinkey_filename  = relinkey_filename,
+            rotatekey_filename = rotatekey_filename,
+            secretkey_filename = secretkey_filename
+        )
+        put_result = await Common.put_chunks(
+            client    = client,
+            bucket_id = bucket_id,
+            key       = ball_id,
+            chunks    = encrypted_chunks,
+            max_retries=max_retries, 
+            timeout=timeout,
+            tags      = tags,
+        )
+        return put_result
+    
+
+
+
+    @staticmethod
     def segment_and_encrypt_ckks_with_executor(
         executor:ProcessPoolExecutor,
         key:str,
@@ -513,6 +916,8 @@ class Common:
         return Chunks(chs= Common.to_chunks_generator(awaitable_chunks=awaitable_chunks),n =n)
     
 
+
+
     @staticmethod
     def encrypt_chunk_ckks(key:str, chunk:Chunk, _round:bool, decimals:int, path:str, ctx_filename:str, pubkey_filename:str, secretkey_filename:str, relinkey_filename:str = "", rotatekey_filename:str = "")-> Chunk:
         try:
@@ -536,6 +941,25 @@ class Common:
             return c
         except Exception as e:
             print("ENCRYPT_CHUNK_ERROR",e)
+    
+
+
+    @staticmethod
+    def encrypt_chunk_ckks_with_initialized_executor(key:str, chunk:Chunk)-> Chunk:
+        try:
+            global ckks
+            global dataowner
+            if ckks is None or dataowner is None:
+                raise Exception("CKKS context or dataowner not initialized. Please run init_ckks_worker_context first.")
+  
+            plaintext_matrix = chunk.to_ndarray().unwrap().copy()
+            encyrpted_chunk:List[PyCtxt] = dataowner.ckks_encrypt_matrix_chunk(plaintext_matrix = plaintext_matrix)
+            data = Common.from_pyctxt_list_to_bytes(xs=encyrpted_chunk)
+            c= Chunk(group_id = key, index = chunk.index, data = data, chunk_id = Some("{}_{}".format(key,chunk.index)))
+            return c
+        except Exception as e:
+            print("ENCRYPT_CHUNK_ERROR",e)
+            raise e
     
 
     @staticmethod
@@ -873,6 +1297,33 @@ class Common:
 
 
     @staticmethod
+    async def segment_and_encrypt_liu_and_put_chunks(
+        executor:ProcessPoolExecutor,
+        dataowner:DataOwner,
+        n:int,
+        np_random:bool,
+        client:AsyncClient,
+        key:str,matrix:npt.NDArray,
+        num_chunks:int=2,
+        tags:Dict[str,str]={},
+        bucket_id:str= "rory"
+    )->Tuple[Result[InterfaceX.PutChunkedResponse,Exception],float,float]:
+        """This is only a convenience method that runs the segment_encrypt_and_putchunks and then puts the chunks. You can run them separately if you want more control over the process or want to do some processing in between."""
+        return await Common.segment_encrypt_and_put_chunks(
+            bucket_id=bucket_id,
+            client=client,
+            dataowner=dataowner,
+            key=key,
+            matrix=matrix,
+            n=n,
+            np_random=np_random,
+            num_chunks=num_chunks,
+            tags=tags,
+            executor=executor
+        )
+
+
+    @staticmethod
     async def segment_encrypt_and_put_chunks(
         executor:ProcessPoolExecutor,
         dataowner:DataOwner,
@@ -916,7 +1367,7 @@ class Common:
         rotatekey_filename:str="",
         tags:Dict[str,str]={},
         timeout:int =300,
-        max_retries:int =5
+        max_attempts:int =5
     ) -> Result[InterfaceX.PutChunkedResponse,Exception]:
         t1     = T.time()
         
@@ -940,12 +1391,58 @@ class Common:
             key       = key,
             chunks    = chunks,
             timeout   = timeout,
-            max_tries= max_retries,
-            tags=tags
+            max_tries = max_attempts,
+            tags      = tags
             
         )
         return put_result
-      
+    
+    @staticmethod
+    async def segment_encrypt_with_vector_ckks_and_put_chunks_with_initialized_executor(
+        client: AsyncClient,
+        bucket_id:str,
+        key:str, 
+        vector:npt.NDArray, 
+        _round:bool,
+        decimals:int,
+        path:str,
+        ctx_filename:str,
+        pubkey_filename:str,
+        secretkey_filename:str,
+        relinkey_filename:str="",
+        rotatekey_filename:str="",
+        tags:Dict[str,str]={},
+        timeout:int =300,
+        max_workers:int = 2,
+        max_attempts:int =5
+    ):
+        try:
+            executor = ProcessPoolExecutor(
+                max_workers = max_workers,
+                initializer = Common.init_ckks_worker_context,
+                initargs    = (path, ctx_filename, pubkey_filename, secretkey_filename, relinkey_filename, rotatekey_filename, _round, decimals)
+            )
+            return await Common.segment_encrypt_with_vector_ckks_and_put_chunks_with_executor(
+                client             = client,
+                bucket_id          = bucket_id,
+                executor           = executor,
+                key                = key,
+                vector             = vector,
+                _round             = _round,
+                decimals           = decimals,
+                path               = path,
+                ctx_filename       = ctx_filename,
+                pubkey_filename    = pubkey_filename,
+                secretkey_filename = secretkey_filename,
+                relinkey_filename  = relinkey_filename,
+                rotatekey_filename = rotatekey_filename,
+                tags               = tags,
+                timeout            = timeout,
+                max_attempts        = max_attempts
+
+            )
+        except Exception as e:
+            raise e
 
     @staticmethod
     async def put_chunks(client:AsyncClient,key:str,chunks:Chunks,timeout:int=300,max_retries:int=5,tags:Dict[str,str]={},bucket_id:str= "rory"):
