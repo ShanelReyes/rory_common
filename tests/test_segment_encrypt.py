@@ -1,158 +1,157 @@
-import os
 import pytest
 import numpy as np
+import numpy.typing as npt
+from mictlanx import AsyncClient
 from rorycommon import Common as RoryCommon
 from concurrent.futures import ProcessPoolExecutor
 from rory.core.security.dataowner import DataOwner
-from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
-from rory.core.security.cryptosystem.liu import Liu
-from rory.core.security.cryptosystem.pqc.ckks import Ckks
 
 
-dataowner = DataOwner(
-    liu_scheme= Liu(
-        _round         = True,
-        decimals       = 2,
-        secure_random  = False,
-        seed           = 1,
-        use_np_random  = True,
-        security_level = 128
-    ),
-)
-RORY_KEYS_PATH = os.environ.get("RORY_KEYS_PATH", "/rory/keys")
-RORY_SOURCE_PATH = os.environ.get("RORY_SOURCE_PATH", "/rory/source")
-_ = Ckks.create_client(
-    scheme      = "CKKS",
-    decimals=2,
-    enable_relinearize=True,
-    security_level=128,
-    save        = True,
-    output_path = RORY_KEYS_PATH
-)
-
-ckks = Ckks.from_pyfhel(
-    _round             = True,
-    decimals           = 2,
-    path               = RORY_KEYS_PATH,
-    # ctx_filename       = ctx_filename,
-    # pubkey_filename    = pubkey_filename,
-    # secretkey_filename = secretkey_filename,
-    # relinkey_filename  = relinkey_filename,
-) 
-dataowner_pqc = DataOwnerPQC(
-    scheme=ckks,
-    securitylevel=128
-
-)
-
-key = "encryptedskmeansy"
-bucket_id = "rory"
-
-
-
-
-# @pytest.mark.skip("")
 @pytest.mark.asyncio
-async def test_liu():
-    # pmt = await RoryCommon.read_numpy_from(
-    #     path="/rory/source/clusteringc0r10a5k20.npy",
-    #     extension="npy"
-    # )
-    # pmt = pmt.unwrap()
-    pmt = np.random.random(size=(10, 10))
-    # print(pmt.dtype)
-    # np.random.seed(10)
+async def test_liu(
+    dataowner:DataOwner,
+    key:str,
+    generated_matrix:npt.NDArray[np.float64],
+    executor:ProcessPoolExecutor,
+    get_context:dict
+):
+    RORY_MAX_WORKERS = get_context["max_workers"]
 
-    n = pmt.shape[0]*pmt.shape[1]*dataowner.m
-    num_chunks = 2
+    n   = generated_matrix.shape[0]*generated_matrix.shape[1]*dataowner.m
     emt = RoryCommon.segment_and_encrypt_liu_with_executor(
-        executor         = ProcessPoolExecutor(max_workers=num_chunks),
+        executor         = executor,
         dataowner        = dataowner,
         key              = key,
         n                = n,
         np_random        = True,
-        num_chunks       = num_chunks,
-        plaintext_matrix = pmt
+        num_chunks       = RORY_MAX_WORKERS,
+        plaintext_matrix = generated_matrix
     )
-    assert len(emt) == num_chunks
-
-    
+    assert len(emt) == RORY_MAX_WORKERS
 
 
 
-@pytest.mark.skip("")
+
 @pytest.mark.asyncio
-async def test_fdhope():
-    pmt_result = await RoryCommon.read_numpy_from(
-        path=os.path.join(RORY_SOURCE_PATH, "clusteringc0r10a5k20.npy"),
-        extension="npy"
-    )
-    pmt = pmt_result.unwrap()
-    # print(pmt.dtype)
-    # np.random.seed(10)
+async def test_fdhope(
+    generated_matrix:np.ndarray,
+    dataowner:DataOwner,
+    key:str,
+    executor:ProcessPoolExecutor,
+    get_context:dict
+):
+    RORY_MAX_WORKERS = get_context["max_workers"]
 
-    n          = pmt.shape[1]*pmt.shape[1]*pmt.shape[0]
-    num_chunks = 2
+    n          = generated_matrix.shape[1]*generated_matrix.shape[1]*generated_matrix.shape[0]
     sens       = 0.2
     algorithm  = "DBSKMEANS"
     udm        = dataowner.get_U(
         algorithm        = algorithm,
-        plaintext_matrix = pmt
+        plaintext_matrix = generated_matrix
     )
     # print(udm)
     emt = RoryCommon.segment_and_encrypt_fdhope_with_executor(
-        executor         = ProcessPoolExecutor(max_workers=num_chunks),
+        executor         = executor,
         algorithm        = algorithm,
         key              = key,
         dataowner        = dataowner,
         matrix           = udm,
         n                = n,
-        num_chunks       = num_chunks,
+        num_chunks       = RORY_MAX_WORKERS,
         sens             = sens
     )
     for c in emt:
         print(c)
 
-@pytest.mark.skip("")
-@pytest.mark.asyncio
-async def test_generate_ckks_keys():
-    x = Ckks.create_client(
-        scheme="CKKS",
-        n=8192,
-        scale=2**30,
-        qi_sizes=[60,40,40,60],
-        decimals=2,
-        save=True,
-        output_path=RORY_KEYS_PATH
 
-    )
-    x.he_object.res
-    print(x)
-@pytest.mark.skip("")
 @pytest.mark.asyncio
-async def test_ckks():
-    pmt_result = await RoryCommon.read_numpy_from(
-        path=os.path.join(RORY_SOURCE_PATH, "clusteringc0r10a5k20.npy"),
-        extension="npy"
-    )
-    assert pmt_result.is_ok
-    pmt = pmt_result.unwrap()
-
-    n          = pmt.shape[1]*pmt.shape[1]
-    num_chunks = 2
+async def test_ckks(generated_matrix:npt.NDArray[np.float64],key:str, initialized_executor:ProcessPoolExecutor, get_context:dict):
+    RORY_MAX_WORKERS               = get_context["max_workers"]
+    RORY_COMMON_CTX_FILENAME       = get_context["ctx"]
+    RORY_COMMON_PUBKEY_FILENAME    = get_context["pubkey"]
+    RORY_COMMON_SECRETKEY_FILENAME = get_context["secretkey"]
+    RORY_KEYS_PATH                 = get_context["keys_path"]
+    pmt                            = generated_matrix
+    n                              = pmt.shape[1]*pmt.shape[1]
     emt = RoryCommon.segment_and_encrypt_ckks_with_executor(
-        executor         = ProcessPoolExecutor(max_workers=num_chunks),
-        key              = key,
-        plaintext_matrix = pmt,
-        n                = n,
-        num_chunks       = num_chunks,
-        _round = False,
-        ctx_filename="ctx", 
-        pubkey_filename="pubkey",
-        secretkey_filename="secretkey",
-        path=RORY_KEYS_PATH,
-        decimals=2
+        executor           = initialized_executor,
+        key                = key,
+        plaintext_matrix   = pmt,
+        n                  = n,
+        num_chunks         = RORY_MAX_WORKERS,
+        _round             = False,
+        ctx_filename       = RORY_COMMON_CTX_FILENAME,
+        pubkey_filename    = RORY_COMMON_PUBKEY_FILENAME,
+        secretkey_filename = RORY_COMMON_SECRETKEY_FILENAME,
+        path               = RORY_KEYS_PATH,
+        decimals           = 2
     )
     for c in emt:
         print(c)
 
+
+@pytest.mark.asyncio
+async def test_segement_ckks_encrypt_with_initialized_executor(generated_matrix:npt.NDArray[np.float64],key:str, executor:ProcessPoolExecutor, get_context:dict):
+    RORY_MAX_WORKERS               = get_context["max_workers"]
+    RORY_COMMON_CTX_FILENAME       = get_context["ctx"]
+    RORY_COMMON_PUBKEY_FILENAME    = get_context["pubkey"]
+    RORY_COMMON_SECRETKEY_FILENAME = get_context["secretkey"]
+    RORY_KEYS_PATH                 = get_context["keys_path"]
+
+    n          = generated_matrix.shape[1]*generated_matrix.shape[1]
+    emt = RoryCommon.segment_and_encrypt_ckks_with_initialized_executor(
+        key                = key,
+        plaintext_matrix   = generated_matrix,
+        n                  = n,
+        num_chunks         = RORY_MAX_WORKERS,
+        _round             = False,
+        ctx_filename       = RORY_COMMON_CTX_FILENAME,
+        pubkey_filename    = RORY_COMMON_PUBKEY_FILENAME,
+        secretkey_filename = RORY_COMMON_SECRETKEY_FILENAME,
+        path               = RORY_KEYS_PATH,
+        decimals           = 2
+    )
+    for c in emt:
+        print(c)
+
+@pytest.mark.asyncio
+async def test_segement_ckks_encrypt_put_chunks_with_initialized_executor(
+    ball_id:str,
+    bucket_id:str,
+    key:str,
+    generated_matrix:npt.NDArray[np.float64],
+    client:AsyncClient,
+    get_context:dict
+):
+    RORY_MAX_WORKERS               = get_context["max_workers"]
+    RORY_COMMON_CTX_FILENAME       = get_context["ctx"]
+    RORY_COMMON_PUBKEY_FILENAME    = get_context["pubkey"]
+    RORY_COMMON_SECRETKEY_FILENAME = get_context["secretkey"]
+    RORY_COMMON_RELINKEY_FILENAME  = get_context["relinkey"]
+    RORY_COMMON_ROTATEKEY_FILENAME = get_context["rotatekey"]
+    RORY_KEYS_PATH                 = get_context["keys_path"]
+    max_attempts = 3
+    tags = {"ball_id": ball_id, "bucket_id": bucket_id}
+    decimals = 2
+
+    n          = generated_matrix.shape[1]*generated_matrix.shape[1]
+    emt = await RoryCommon.segement_and_encrypt_ckks_with_initialized_executor_put_chunks(
+        client             = client,
+        bucket_id          = bucket_id,
+        ball_id            = ball_id,
+        key                = key,
+        plaintext_matrix   = generated_matrix,
+        n                  = n,
+        num_chunks         = RORY_MAX_WORKERS,
+        _round             = False,
+        keys_path          = RORY_KEYS_PATH,
+        ctx_filename       = RORY_COMMON_CTX_FILENAME,
+        pubkey_filename    = RORY_COMMON_PUBKEY_FILENAME,
+        secretkey_filename = RORY_COMMON_SECRETKEY_FILENAME,
+        max_retries        = max_attempts,
+        relinkey_filename  = RORY_COMMON_RELINKEY_FILENAME,
+        rotatekey_filename = RORY_COMMON_ROTATEKEY_FILENAME,
+        tags               = tags,
+        decimals           = decimals
+    )
+    assert emt.is_ok

@@ -1,43 +1,46 @@
 import pytest
 from rorycommon import Common as RoryCommon
-import os 
 import numpy as np
 from option import Some
 from mictlanx import AsyncClient
 from mictlanx.utils.segmentation import Chunks
 from concurrent.futures import ProcessPoolExecutor
 from rory.core.security.dataowner import DataOwner
-from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
-from rory.core.security.cryptosystem.liu import Liu
+import numpy.typing as npt
+# from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
+# from rory.core.security.cryptosystem.liu import Liu
 from rory.core.utils.constants import Constants
-from rory.core.security.cryptosystem.pqc.ckks import Ckks
+# from rory.core.security.cryptosystem.pqc.ckks import Ckks
 from rory.core.clustering.secure.pqc.skmeans import Skmeans as SkmeansPQC
 from uuid import uuid4
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 
-RORY_COMMON_ENV_FILE_PATH = os.environ.get("RORY_COMMON_ENV_FILE_PATH","./.env.test")
-if os.path.exists(RORY_COMMON_ENV_FILE_PATH):
-    load_dotenv(dotenv_path=RORY_COMMON_ENV_FILE_PATH)
-
-
-MICTLANX_CLIENT_ID             = os.environ.get("MICTLANX_CLIENT_ID","{}_mictlanx".format("rory-common"))
-MICTLANX_TIMEOUT               = int(os.environ.get("MICTLANX_TIMEOUT",3600))
-MICTLANX_API_VERSION           = int(os.environ.get("MICTLANX_API_VERSION","4"))
-MICTLANX_MAX_WORKERS           = int(os.environ.get("MICTLANX_MAX_WORKERS","12"))
-MICTLANX_BUCKET_ID             = os.environ.get("MICTLANX_BUCKET_ID","rory")
-MICTLANX_OUTPUT_PATH           = os.environ.get("MICTLANX_OUTPUT_PATH","/rory/mictlanx")
-MICTLANX_PROTOCOL              = os.environ.get("MICTLANX_PROTOCOL","http")
-MICTLANX_URI                   = os.environ.get("MICTLANX_URI",f"mictlanx://mictlanx-router-0@localhost:63666?api_version={MICTLANX_API_VERSION}&protocol={MICTLANX_PROTOCOL}")
-MICTLANX_DEBUG                 = bool(int(os.environ.get("MICTLANX_DEBUG",0)))
-RORY_KEYS_PATH                 = os.environ.get("RORY_KEYS_PATH","/rory/keys")
-RORY_COMMON_CTX_FILENAME       = os.environ.get("RORY_COMMON_CTX_FILENAME","ctx")
-RORY_COMMON_PUBKEY_FILENAME    = os.environ.get("RORY_COMMON_PUBKEY_FILENAME","pubkey")
-RORY_COMMON_SECRETKEY_FILENAME = os.environ.get("RORY_COMMON_SECRETKEY_FILENAME","secretkey")
-RORY_COMMON_SECURITY_LEVEL     = int(os.environ.get("RORY_COMMON_SECURITY_LEVEL",128))
-RORY_COMMON_RECORDS            = int(os.environ.get("RORY_COMMON_RECORDS","10"))
-RORY_COMMON_ATTRIBUTES         = int(os.environ.get("RORY_COMMON_ATTRIBUTES","10"))
+# RORY_COMMON_ENV_FILE_PATH = os.environ.get("RORY_COMMON_ENV_FILE_PATH","./.env.test")
+# if os.path.exists(RORY_COMMON_ENV_FILE_PATH):
+#     load_dotenv(dotenv_path=RORY_COMMON_ENV_FILE_PATH)
 
 
+# MICTLANX_CLIENT_ID             = os.environ.get("MICTLANX_CLIENT_ID","{}_mictlanx".format("rory-common"))
+# MICTLANX_TIMEOUT               = int(os.environ.get("MICTLANX_TIMEOUT",3600))
+# MICTLANX_API_VERSION           = int(os.environ.get("MICTLANX_API_VERSION","4"))
+# MICTLANX_MAX_WORKERS           = int(os.environ.get("MICTLANX_MAX_WORKERS","12"))
+# MICTLANX_BUCKET_ID             = os.environ.get("MICTLANX_BUCKET_ID","rory")
+# MICTLANX_OUTPUT_PATH           = os.environ.get("MICTLANX_OUTPUT_PATH","/rory/mictlanx")
+# MICTLANX_PROTOCOL              = os.environ.get("MICTLANX_PROTOCOL","http")
+# MICTLANX_URI                   = os.environ.get("MICTLANX_URI",f"mictlanx://mictlanx-router-0@localhost:63666?api_version={MICTLANX_API_VERSION}&protocol={MICTLANX_PROTOCOL}")
+# MICTLANX_DEBUG                 = bool(int(os.environ.get("MICTLANX_DEBUG",0)))
+# RORY_KEYS_PATH                 = os.environ.get("RORY_KEYS_PATH","/rory/keys")
+# RORY_COMMON_CTX_FILENAME       = os.environ.get("RORY_COMMON_CTX_FILENAME","ctx")
+# RORY_COMMON_PUBKEY_FILENAME    = os.environ.get("RORY_COMMON_PUBKEY_FILENAME","pubkey")
+# RORY_COMMON_SECRETKEY_FILENAME = os.environ.get("RORY_COMMON_SECRETKEY_FILENAME","secretkey")
+# RORY_COMMON_SECURITY_LEVEL     = int(os.environ.get("RORY_COMMON_SECURITY_LEVEL",128))
+# RORY_COMMON_RECORDS            = int(os.environ.get("RORY_COMMON_RECORDS","10"))
+# RORY_COMMON_ATTRIBUTES         = int(os.environ.get("RORY_COMMON_ATTRIBUTES","10"))
+
+
+# RORY_MAX_WORKERS                  = int(os.environ.get("RORY_MAX_WORKERS","2"))
+# RORY_ENABLE_ROTATE_KEY_GENERATION = bool(int(os.environ.get("RORY_ENABLE_ROTATE_KEY_GENERATION",0)))
+# RORY_SOURCE_PATH                  = os.environ.get("RORY_SOURCE_PATH", "/rory/source")
 
 
 # dataowner_pqc = DataOwnerPQC(
@@ -47,59 +50,60 @@ RORY_COMMON_ATTRIBUTES         = int(os.environ.get("RORY_COMMON_ATTRIBUTES","10
 # )
 
 
-@pytest.fixture(scope="module")
-def ckks():
-    _ = Ckks.create_client(
-        scheme             = "CKKS",
-        decimals           = 2,
-        enable_relinearize = True,
-        security_level     = 128,
-        save               = True,
-        output_path        = RORY_KEYS_PATH
-    )
-    ckks = Ckks.from_pyfhel(
-        path=RORY_KEYS_PATH,
-    )
-    return ckks
+# @pytest.fixture(scope="module")
+# def ckks():
+#     _ = Ckks.create_client(
+#         scheme             = "CKKS",
+#         decimals           = 2,
+#         enable_relinearize = True,
+#         security_level     = 128,
+#         save               = True,
+#         output_path        = RORY_KEYS_PATH
+#     )
+#     ckks = Ckks.from_pyfhel(
+#         path=RORY_KEYS_PATH,
+#     )
+#     return ckks
 
-@pytest.fixture(scope="module") 
-def dataowner_pqc(ckks):
-    dataowner_pqc = DataOwnerPQC(
-        scheme=ckks,
-        securitylevel=RORY_COMMON_SECURITY_LEVEL
-    )
-    return dataowner_pqc
+# @pytest.fixture(scope="module") 
+# def dataowner_pqc(ckks):
+#     dataowner_pqc = DataOwnerPQC(
+#         scheme=ckks,
+#         securitylevel=RORY_COMMON_SECURITY_LEVEL
+#     )
+#     return dataowner_pqc
 
-@pytest.fixture(scope="module")
-def dataowner():
-    dataowner = DataOwner(
-        liu_scheme    = Liu(),
-        seed          = None,
-        securitylevel = RORY_COMMON_SECURITY_LEVEL,
-    )
-    return dataowner
+# @pytest.fixture(scope="module")
+# def dataowner():
+#     dataowner = DataOwner(
+#         liu_scheme    = Liu(),
+#         seed          = None,
+#         securitylevel = RORY_COMMON_SECURITY_LEVEL,
+#     )
+#     return dataowner
 
-@pytest.fixture(scope="module")
-def client():
-    client = AsyncClient(
-        uri              = MICTLANX_URI,
-        client_id        = MICTLANX_CLIENT_ID,
-        capacity_storage = "200mb",
-        debug            = MICTLANX_DEBUG,
-        eviction_policy  = "LRU",
-        max_workers      = MICTLANX_MAX_WORKERS,
-        verify           = False
-    )
-    return client
+# @pytest.fixture(scope="module")
+# def client():
+#     client = AsyncClient(
+#         uri              = MICTLANX_URI,
+#         client_id        = MICTLANX_CLIENT_ID,
+#         capacity_storage = "200mb",
+#         debug            = MICTLANX_DEBUG,
+#         eviction_policy  = "LRU",
+#         max_workers      = MICTLANX_MAX_WORKERS,
+#         verify           = False
+#     )
+#     return client
 
 
-@pytest.fixture(scope="module")
-def matrix():
-    return np.random.rand(RORY_COMMON_RECORDS, RORY_COMMON_ATTRIBUTES)
 
 @pytest.mark.asyncio
-async def test_get_encrypt_ckks_matrix_chunk(dataowner_pqc, client,matrix):
+async def test_ckks_encrypt_put_and_get_chunk(dataowner_pqc, client,generated_matrix,get_context):
     # bucket_id = "rory"
+    MICTLANX_BUCKET_ID = get_context["bucket_id"]
+    RORY_COMMON_RECORDS = get_context["records"]
+    RORY_COMMON_ATTRIBUTES = get_context["attributes"]
+    RORY_MAX_WORKERS = get_context["max_workers"]
     ball_id   = uuid4().hex.replace("-","")
     res = await RoryCommon.encrypt_ckks_and_put_chunk(
         client       = client,
@@ -109,10 +113,11 @@ async def test_get_encrypt_ckks_matrix_chunk(dataowner_pqc, client,matrix):
         index        = 0,
         full_shape   = (RORY_COMMON_RECORDS, RORY_COMMON_ATTRIBUTES),
         max_attempts = 5,
-        ndarray      = matrix,
-        num_chunks   = 1,
+        ndarray      = generated_matrix,
+        num_chunks   = RORY_MAX_WORKERS,
         max_backoff  = 5,
         timeout      = 120
+
 
     )
     assert res.is_ok, "Failed to encrypt and put chunk: {}".format(res.unwrap_err())
@@ -130,18 +135,19 @@ async def test_get_encrypt_ckks_matrix_chunk(dataowner_pqc, client,matrix):
 
 
 @pytest.mark.asyncio
-async def test_put_chunks(dataowner, client,matrix):
-    key        = uuid4().hex.replace("-","")
-    n          = matrix.shape[0]*matrix.shape[1]*dataowner.m
-    num_chunks = 2
+async def test_liu_segment_encrypt_and_put_chunks(dataowner, client,generated_matrix,get_context):
+    key                = uuid4().hex.replace("-","")
+    n                  = generated_matrix.shape[0]*generated_matrix.shape[1]*dataowner.m
+    RORY_MAX_WORKERS   = get_context["max_workers"]
+    MICTLANX_BUCKET_ID = get_context["bucket_id"]
     emt = RoryCommon.segment_and_encrypt_liu_with_executor(
-        executor         = ProcessPoolExecutor(max_workers=num_chunks),
+        executor         = ProcessPoolExecutor(max_workers=RORY_MAX_WORKERS),
         dataowner        = dataowner,
         key              = key,
         n                = n,
         np_random        = True,
-        num_chunks       = num_chunks,
-        plaintext_matrix = matrix
+        num_chunks       = RORY_MAX_WORKERS,
+        plaintext_matrix = generated_matrix
     )
     # emt.sort()
     for c in emt:
@@ -156,8 +162,8 @@ async def test_put_chunks(dataowner, client,matrix):
         bucket_id = MICTLANX_BUCKET_ID,
         chunks    = emt,
         tags      = {
-            "full_shape": str((matrix.shape[0],matrix.shape[1],dataowner.m)),
-            "full_dtype": str(matrix.dtype)
+            "full_shape": str((generated_matrix.shape[0],generated_matrix.shape[1],dataowner.m)),
+            "full_dtype": str(generated_matrix.dtype)
         }
     ) 
     assert put_res.is_ok, "Failed to put chunks: {}".format(put_res.unwrap_err())
@@ -169,22 +175,58 @@ async def test_put_chunks(dataowner, client,matrix):
     )
     assert get_res.is_ok, "Failed to get and merge chunks: {}".format(get_res.unwrap_err())
     merged_array = get_res.unwrap()
-    assert merged_array.shape == (matrix.shape[0],matrix.shape[1],dataowner.m), "Merged array shape mismatch: expected {}, got {}".format((matrix.shape[0],matrix.shape[1],dataowner.m), merged_array.shape)
+    assert merged_array.shape == (generated_matrix.shape[0],generated_matrix.shape[1],dataowner.m), "Merged array shape mismatch: expected {}, got {}".format((generated_matrix.shape[0],generated_matrix.shape[1],dataowner.m), merged_array.shape)
+
+
+@pytest.mark.asyncio
+async def test_liu_shortcut_segment_encrypt_and_put_chunks_with_executor(
+    executor:ProcessPoolExecutor,
+    dataowner:DataOwner,
+    client:AsyncClient,
+    generated_matrix:npt.NDArray[np.float64],
+    get_context:dict
+):
+    key                = uuid4().hex.replace("-","")
+    n                  = generated_matrix.shape[0]*generated_matrix.shape[1]*dataowner.m
+    RORY_MAX_WORKERS   = get_context["max_workers"]
+    MICTLANX_BUCKET_ID = get_context["bucket_id"]
+    
+    pack = (await RoryCommon.segment_and_encrypt_liu_and_put_chunks(
+        executor   = executor,
+        dataowner  = dataowner,
+        n          = n,
+        key        = key,
+        num_chunks = RORY_MAX_WORKERS,
+        bucket_id  = MICTLANX_BUCKET_ID,
+        client     = client,
+        matrix     = generated_matrix,
+        np_random  = True,
+        tags       = {}
+    ))
+
+    (emt,_,_) = pack
+
+    assert emt.is_ok, "Failed to segment, encrypt and put chunks: {}".format(emt.unwrap_err())
 
 
 
 
 # @pytest.mark.skip("")
 @pytest.mark.asyncio
-async def test_put_get_pqx(ckks, client,matrix):
-    key        = uuid4().hex.replace("-","")
-    n          = matrix.shape[1]*matrix.shape[1]
-    num_chunks = 2
+async def test_ckks_segment_encrypt_delete_put_get_chunks(key,ckks, client,generated_matrix,get_context):
+    # key                            = uuid4().hex.replace("-","")
+    n                              = generated_matrix.shape[1]*generated_matrix.shape[1]
+    num_chunks                     = get_context["max_workers"]
+    RORY_COMMON_CTX_FILENAME       = get_context["ctx"]
+    RORY_COMMON_PUBKEY_FILENAME    = get_context["pubkey"]
+    RORY_COMMON_SECRETKEY_FILENAME = get_context["secretkey"]
+    RORY_KEYS_PATH                 = get_context["keys_path"]
+    MICTLANX_BUCKET_ID             = get_context["bucket_id"]
 
     emt = RoryCommon.segment_and_encrypt_ckks_with_executor(
         executor           = ProcessPoolExecutor(max_workers=num_chunks),
         key                = key,
-        plaintext_matrix   = matrix,
+        plaintext_matrix   = generated_matrix,
         n                  = n,
         num_chunks         = num_chunks,
         _round             = False,
@@ -215,21 +257,32 @@ async def test_put_get_pqx(ckks, client,matrix):
     )
     assert x is not None, "Failed to get pyctxt: {}".format(x)
 
+
+
+
+
+
 # @pytest.mark.skip("")
 @pytest.mark.asyncio
-async def test_full_skmeans_pqc(dataowner_pqc, client,matrix,ckks):
-    executor            = ProcessPoolExecutor(max_workers=2)
-    init_sm_id          = f"initsmid{uuid4().hex.replace('-','')}"
-    num_chunks          = 2
-    _round              = False
-    decimals            = 2
-    dataowner           = dataowner_pqc
-    plaintext_matrix    = matrix
-    encrypted_matrix_id = uuid4().hex.replace("-","")
-    r                   = plaintext_matrix.shape[0]
-    a                   = plaintext_matrix.shape[1]
-    n                   = a*r
-    k                   = 2
+async def test_full_skmeans_pqc(executor,dataowner_pqc, client,generated_matrix,ckks,get_context):
+    # executor            = ProcessPoolExecutor(max_workers=2)
+    RORY_MAX_WORKERS               = get_context["max_workers"]
+    MICTLANX_BUCKET_ID             = get_context["bucket_id"]
+    RORY_COMMON_CTX_FILENAME       = get_context["ctx"]
+    RORY_COMMON_PUBKEY_FILENAME    = get_context["pubkey"]
+    RORY_COMMON_SECRETKEY_FILENAME = get_context["secretkey"]
+    RORY_KEYS_PATH                 = get_context["keys_path"]
+    init_sm_id                     = f"initsmid{uuid4().hex.replace('-','')}"
+    # num_chunks                     = 2
+    _round                         = False
+    decimals                       = 2
+    dataowner                      = dataowner_pqc
+    plaintext_matrix               = generated_matrix
+    encrypted_matrix_id            = uuid4().hex.replace("-","")
+    r                              = plaintext_matrix.shape[0]
+    a                              = plaintext_matrix.shape[1]
+    n                              = a*r
+    k                              = 2
     udm_id              = f"udmid{uuid4().hex.replace('-','')}"
     encrypted_shift_matrix_id = f"encryptedshiftmatrixid{uuid4().hex.replace('-','')}"
 
@@ -244,7 +297,7 @@ async def test_full_skmeans_pqc(dataowner_pqc, client,matrix,ckks):
         ctx_filename       = RORY_COMMON_CTX_FILENAME,
         pubkey_filename    = RORY_COMMON_PUBKEY_FILENAME,
         secretkey_filename = RORY_COMMON_SECRETKEY_FILENAME,
-        num_chunks         = num_chunks,
+        num_chunks         = RORY_MAX_WORKERS,
     )
     put_encrypted_matrix_result = await RoryCommon.delete_and_put_chunks(
         client = client,
@@ -266,7 +319,7 @@ async def test_full_skmeans_pqc(dataowner_pqc, client,matrix,ckks):
         key                = init_sm_id,
         plaintext_matrix   = zero_shiftmatrix,
         n                  = n2,
-        num_chunks         = num_chunks,
+        num_chunks         = RORY_MAX_WORKERS,
         _round             = _round,
         decimals           = decimals,
         path               = RORY_KEYS_PATH,
@@ -274,7 +327,7 @@ async def test_full_skmeans_pqc(dataowner_pqc, client,matrix,ckks):
         pubkey_filename    = RORY_COMMON_PUBKEY_FILENAME,
         secretkey_filename = RORY_COMMON_SECRETKEY_FILENAME
     )
-    assert len(encrypted_zero_shiftmatrix_chunks) == num_chunks, "Number of encrypted zero shift matrix chunks mismatch: expected {}, got {}".format(num_chunks, len(encrypted_zero_shiftmatrix_chunks))
+    assert len(encrypted_zero_shiftmatrix_chunks) == RORY_MAX_WORKERS, "Number of encrypted zero shift matrix chunks mismatch: expected {}, got {}".format(RORY_MAX_WORKERS, len(encrypted_zero_shiftmatrix_chunks))
 
  
     put_encrypted_zero_shiftmatrix_result = await RoryCommon.delete_and_put_chunks(
@@ -298,7 +351,7 @@ async def test_full_skmeans_pqc(dataowner_pqc, client,matrix,ckks):
         ndarray      = udm,
         group_id     = udm_id,
         chunk_prefix = Some(udm_id),
-        num_chunks   = num_chunks,
+        num_chunks   = RORY_MAX_WORKERS,
     )
 
 
@@ -346,8 +399,8 @@ async def test_full_skmeans_pqc(dataowner_pqc, client,matrix,ckks):
         UDM=_udm,
     ).unwrap()
 
-    encrypted_shift_matrix_chunks = RoryCommon.from_pyctxts_to_chunks(key=encrypted_shift_matrix_id, xs = S1,num_chunks=num_chunks).unwrap()
-    assert len(encrypted_shift_matrix_chunks) == num_chunks, "Number of encrypted shift matrix chunks mismatch: expected {}, got {}".format(num_chunks, len(encrypted_shift_matrix_chunks))
+    encrypted_shift_matrix_chunks = RoryCommon.from_pyctxts_to_chunks(key=encrypted_shift_matrix_id, xs = S1,num_chunks=RORY_MAX_WORKERS).unwrap()
+    assert len(encrypted_shift_matrix_chunks) == RORY_MAX_WORKERS, "Number of encrypted shift matrix chunks mismatch: expected {}, got {}".format(RORY_MAX_WORKERS, len(encrypted_shift_matrix_chunks))
     z = await RoryCommon.delete_and_put_chunks(
         client = client,
         bucket_id      = MICTLANX_BUCKET_ID,
