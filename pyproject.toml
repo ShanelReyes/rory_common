@@ -18,7 +18,7 @@ mictlanx = "0.1.0a5"
 phe = "^1.5.0"
 pyfhel = "3.5.0"
 python-dotenv = "^1.2.2"
-rory = "0.1.2"
+rory = {version = "0.1.3", source = "testpypi"}
 
 [tool.poetry]
 packages = [{include = "rorycommon", from = "src"}]
@@ -39,7 +39,7 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [[tool.poetry.source]]
-name = "test"
+name = "testpypi"
 url = "https://test.pypi.org/simple/"
 priority = "supplemental"
 
