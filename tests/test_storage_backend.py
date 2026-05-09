@@ -3,8 +3,7 @@ import numpy as np
 import pandas as pd
 from uuid import uuid4
 from Pyfhel import PyCtxt
-from rorycommon import StorageBuilder, StorageBackend, StorageParams, Algorithm
-from rory.core.security.dataowner_paillier import DataOwner as DataOwnerPHE
+from rorycommon import StorageBuilder, StorageBackend, StorageParams, Algorithm, CkksParams, LiuParams
 from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
 
 import os
@@ -52,25 +51,18 @@ def tmp_csv_file(tmp_path, small_matrix):
     return str(path), "csv"
 
 
-def ckks_builder(client, ckks):
+def ckks_builder(client, ckks, ckks_params):
     """StorageBuilder wired for CKKS with full key config."""
     return StorageBuilder(
-        storage_client     = client,
-        algorithm          = Algorithm.CKKS,
-        ckks               = ckks,
-        keys_path          = RORY_KEYS_PATH,
-        ctx_filename       = RORY_COMMON_CTX_FILENAME,
-        pubkey_filename    = RORY_COMMON_PUBKEY_FILENAME,
-        secretkey_filename = RORY_COMMON_SECRETKEY_FILENAME,
-        relinkey_filename  = RORY_COMMON_RELINKEY_FILENAME,
-        rotatekey_filename = RORY_COMMON_ROTATEKEY_FILENAME,
-        decimals           = 2,
-        _round             = True,
+        storage_client = client,
+        algorithm      = Algorithm.CKKS,
+        ckks           = ckks,
+        ckks_params    = ckks_params,
     ).build()
 
 
-def liu_builder(client, dataowner):
-    return StorageBuilder(storage_client=client, algorithm=Algorithm.LIU, dataowner=dataowner).build()
+def liu_builder(client, liu_params):
+    return StorageBuilder(storage_client=client, algorithm=Algorithm.LIU, liu_params=liu_params).build()
 
 
 # ---------------------------------------------------------------------------
@@ -138,10 +130,10 @@ async def test_builder_defaults_to_storage_params(client, ckks):
     assert isinstance(backend.params, StorageParams)
 
 
-async def test_builder_ckks_key_config(client, ckks):
-    backend = ckks_builder(client, ckks)
-    assert backend.keys_path == RORY_KEYS_PATH
-    assert backend.ctx_filename == RORY_COMMON_CTX_FILENAME
+async def test_builder_ckks_key_config(client, ckks, ckks_params):
+    backend = ckks_builder(client, ckks, ckks_params)
+    assert backend.ckks_params.keys_path == RORY_KEYS_PATH
+    assert backend.ckks_params.ctx_filename == RORY_COMMON_CTX_FILENAME
 
 
 # ---------------------------------------------------------------------------
@@ -149,16 +141,16 @@ async def test_builder_ckks_key_config(client, ckks):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_put_default_ckks(client, ckks, small_matrix, storage_ids):
-    backend = ckks_builder(client, ckks)
+async def test_put_default_ckks(client, ckks, ckks_params, small_matrix, storage_ids):
+    backend = ckks_builder(client, ckks, ckks_params)
     result = await backend.put(**storage_ids, data=small_matrix)
     assert result.is_ok, result.unwrap_err()
     assert result.unwrap().shape == small_matrix.shape
 
 
 @pytest.mark.asyncio
-async def test_put_get_default_ckks(client, ckks, small_matrix, storage_ids):
-    backend = ckks_builder(client, ckks)
+async def test_put_get_default_ckks(client, ckks, ckks_params, small_matrix, storage_ids):
+    backend = ckks_builder(client, ckks, ckks_params)
     await backend.put(**storage_ids, data=small_matrix)
     result = await backend.get(**storage_ids)
     assert result.is_ok, result.unwrap_err()
@@ -167,16 +159,16 @@ async def test_put_get_default_ckks(client, ckks, small_matrix, storage_ids):
 
 
 @pytest.mark.asyncio
-async def test_put_default_liu(client, dataowner, small_matrix, storage_ids):
-    backend = liu_builder(client, dataowner)
+async def test_put_default_liu(client, liu_params, small_matrix, storage_ids):
+    backend = liu_builder(client, liu_params)
     result = await backend.put(**storage_ids, data=small_matrix)
     assert result.is_ok, result.unwrap_err()
     assert result.unwrap().shape == small_matrix.shape
 
 
 @pytest.mark.asyncio
-async def test_put_get_default_liu(client, dataowner, small_matrix, storage_ids):
-    backend = liu_builder(client, dataowner)
+async def test_put_get_default_liu(client, liu_params, small_matrix, storage_ids):
+    backend = liu_builder(client, liu_params)
     await backend.put(**storage_ids, data=small_matrix)
     result = await backend.get(**storage_ids)
     assert result.is_ok, result.unwrap_err()
@@ -189,16 +181,16 @@ async def test_put_get_default_liu(client, dataowner, small_matrix, storage_ids)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_put_segment_only_ckks(client, ckks, small_matrix, storage_ids):
-    backend = ckks_builder(client, ckks)
+async def test_put_segment_only_ckks(client, ckks, ckks_params, small_matrix, storage_ids):
+    backend = ckks_builder(client, ckks, ckks_params)
     result = await backend.put(**storage_ids, data=small_matrix, segment=True)
     assert result.is_ok, result.unwrap_err()
     assert result.unwrap().shape == small_matrix.shape
 
 
 @pytest.mark.asyncio
-async def test_put_get_segment_ckks(client, ckks, small_matrix, storage_ids):
-    backend:StorageBackend = ckks_builder(client, ckks)
+async def test_put_get_segment_ckks(client, ckks, ckks_params, small_matrix, storage_ids):
+    backend: StorageBackend = ckks_builder(client, ckks, ckks_params)
     bucket_id = storage_ids["bucket_id"]
     ball_id = storage_ids["ball_id"]
     res = await backend.put(bucket_id=bucket_id, ball_id=ball_id, data=small_matrix, segment=True)
@@ -209,16 +201,16 @@ async def test_put_get_segment_ckks(client, ckks, small_matrix, storage_ids):
 
 
 @pytest.mark.asyncio
-async def test_put_segment_only_liu(client, dataowner, small_matrix, storage_ids):
-    backend = liu_builder(client, dataowner)
+async def test_put_segment_only_liu(client, liu_params, small_matrix, storage_ids):
+    backend = liu_builder(client, liu_params)
     result = await backend.put(**storage_ids, data=small_matrix, segment=True)
     assert result.is_ok, result.unwrap_err()
     assert result.unwrap().shape == small_matrix.shape
 
 
 @pytest.mark.asyncio
-async def test_put_get_segment_liu(client, dataowner, small_matrix, storage_ids):
-    backend = liu_builder(client, dataowner)
+async def test_put_get_segment_liu(client, liu_params, small_matrix, storage_ids):
+    backend = liu_builder(client, liu_params)
     await backend.put(**storage_ids, data=small_matrix, segment=True)
     result = await backend.get(**storage_ids, segment=True)
     assert result.is_ok, result.unwrap_err()
@@ -230,15 +222,15 @@ async def test_put_get_segment_liu(client, dataowner, small_matrix, storage_ids)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_put_encrypt_ckks(client, ckks, small_matrix, storage_ids):
-    backend = ckks_builder(client, ckks)
+async def test_put_encrypt_ckks(client, ckks, ckks_params, small_matrix, storage_ids):
+    backend = ckks_builder(client, ckks, ckks_params)
     result = await backend.put(**storage_ids, data=small_matrix, encrypt=True)
     assert result.is_ok, result.unwrap_err()
 
 
 @pytest.mark.asyncio
-async def test_put_get_encrypt_ckks(client, ckks, small_matrix, storage_ids):
-    backend = ckks_builder(client, ckks)
+async def test_put_get_encrypt_ckks(client, ckks, ckks_params, small_matrix, storage_ids):
+    backend = ckks_builder(client, ckks, ckks_params)
     put = await backend.put(**storage_ids, data=small_matrix, encrypt=True)
     assert put.is_ok, put.unwrap_err()
     result = await backend.get(**storage_ids, encrypt=True)
@@ -250,15 +242,15 @@ async def test_put_get_encrypt_ckks(client, ckks, small_matrix, storage_ids):
 
 
 @pytest.mark.asyncio
-async def test_put_encrypt_liu(client, dataowner, small_matrix, storage_ids):
-    backend = liu_builder(client, dataowner)
+async def test_put_encrypt_liu(client, liu_params, small_matrix, storage_ids):
+    backend = liu_builder(client, liu_params)
     result = await backend.put(**storage_ids, data=small_matrix, encrypt=True)
     assert result.is_ok, result.unwrap_err()
 
 
 @pytest.mark.asyncio
-async def test_put_get_encrypt_liu(client, dataowner, small_matrix, storage_ids):
-    backend = liu_builder(client, dataowner)
+async def test_put_get_encrypt_liu(client, liu_params, small_matrix, storage_ids):
+    backend = liu_builder(client, liu_params)
     put = await backend.put(**storage_ids, data=small_matrix, encrypt=True)
     assert put.is_ok, put.unwrap_err()
     result = await backend.get(**storage_ids, encrypt=True)
@@ -272,10 +264,10 @@ async def test_put_get_encrypt_liu(client, dataowner, small_matrix, storage_ids)
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_put_tlist_ckks(client, ckks, small_matrix, storage_ids):
+async def test_put_tlist_ckks(client, ckks, ckks_params, small_matrix, storage_ids):
     dataowner_pqc = DataOwnerPQC(scheme=ckks)
     ciphertexts = dataowner_pqc.ckks_encrypt_matrix_chunk(small_matrix)
-    backend = ckks_builder(client, ckks)
+    backend = ckks_builder(client, ckks, ckks_params)
     result = await backend.put(**storage_ids, data=ciphertexts)
     assert result.is_ok, result.unwrap_err()
 
@@ -285,40 +277,40 @@ async def test_put_tlist_ckks(client, ckks, small_matrix, storage_ids):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_put_from_file_default_ckks(client, ckks, storage_ids, tmp_npy_file):
+async def test_put_from_file_default_ckks(client, ckks, ckks_params, storage_ids, tmp_npy_file):
     path, ext = tmp_npy_file
-    backend = ckks_builder(client, ckks)
+    backend = ckks_builder(client, ckks, ckks_params)
     result = await backend.put_from_file(**storage_ids, path=path, extension=ext)
     assert result.is_ok, result.unwrap_err()
 
 
 @pytest.mark.asyncio
-async def test_put_from_file_encrypt_ckks(client, ckks, storage_ids, tmp_npy_file):
+async def test_put_from_file_encrypt_ckks(client, ckks, ckks_params, storage_ids, tmp_npy_file):
     path, ext = tmp_npy_file
-    backend = ckks_builder(client, ckks)
+    backend = ckks_builder(client, ckks, ckks_params)
     result = await backend.put_from_file(**storage_ids, path=path, extension=ext, encrypt=True)
     assert result.is_ok, result.unwrap_err()
 
 
 @pytest.mark.asyncio
-async def test_put_from_file_default_liu(client, dataowner, storage_ids, tmp_npy_file):
+async def test_put_from_file_default_liu(client, liu_params, storage_ids, tmp_npy_file):
     path, ext = tmp_npy_file
-    backend = liu_builder(client, dataowner)
+    backend = liu_builder(client, liu_params)
     result = await backend.put_from_file(**storage_ids, path=path, extension=ext)
     assert result.is_ok, result.unwrap_err()
 
 
 @pytest.mark.asyncio
-async def test_put_from_file_encrypt_liu(client, dataowner, storage_ids, tmp_npy_file):
+async def test_put_from_file_encrypt_liu(client, liu_params, storage_ids, tmp_npy_file):
     path, ext = tmp_npy_file
-    backend = liu_builder(client, dataowner)
+    backend = liu_builder(client, liu_params)
     result = await backend.put_from_file(**storage_ids, path=path, extension=ext, encrypt=True)
     assert result.is_ok, result.unwrap_err()
 
 
 @pytest.mark.asyncio
-async def test_put_from_file_csv_default_ckks(client, ckks, storage_ids, tmp_csv_file):
+async def test_put_from_file_csv_default_ckks(client, ckks, ckks_params, storage_ids, tmp_csv_file):
     path, ext = tmp_csv_file
-    backend = ckks_builder(client, ckks)
+    backend = ckks_builder(client, ckks, ckks_params)
     result = await backend.put_from_file(**storage_ids, path=path, extension=ext)
     assert result.is_ok, result.unwrap_err()

@@ -3,7 +3,7 @@ import os
 import pytest
 import numpy as np
 from mictlanx import AsyncClient
-from rorycommon import Common as RoryCommon
+from rorycommon import Common as RoryCommon, CkksParams, LiuParams
 from concurrent.futures import ProcessPoolExecutor
 from rory.core.security.dataowner import DataOwner
 from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
@@ -119,6 +119,30 @@ def dataowner():
         ),
     )
     return dataowner
+
+@pytest.fixture
+def ckks_params():
+    return CkksParams(
+        keys_path          = RORY_KEYS_PATH,
+        ctx_filename       = RORY_COMMON_CTX_FILENAME,
+        pubkey_filename    = RORY_COMMON_PUBKEY_FILENAME,
+        secretkey_filename = RORY_COMMON_SECRETKEY_FILENAME,
+        relinkey_filename  = RORY_COMMON_RELINKEY_FILENAME,
+        rotatekey_filename = RORY_COMMON_ROTATEKEY_FILENAME,
+        decimals           = 2,
+        _round             = True,
+    )
+
+@pytest.fixture
+def liu_params():
+    return LiuParams(
+        _round         = True,
+        decimals       = 2,
+        secure_random  = False,
+        seed           = 1,
+        use_np_random  = True,
+        security_level = 128,
+    )
 
 
 

@@ -1,5 +1,6 @@
 import time as T
 import asyncio
+import warnings
 from mictlanx import AsyncClient
 from rorycommon.utils import Utils as RoryCommonUtils
 import mictlanx.interfaces as InterfaceX
@@ -12,6 +13,7 @@ from typing import Self, Tuple, Generator, Dict, AsyncGenerator, Optional, Union
 from mictlanx.utils.segmentation import Chunks,Chunk
 from rory.core.security.dataowner import DataOwner
 from rory.core.security.dataowner_paillier import DataOwner as DataOwnerPHE
+from rory.core.security.cryptosystem.liu import Liu
 from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
 from concurrent.futures import ProcessPoolExecutor
 from Pyfhel import PyCtxt
@@ -80,6 +82,54 @@ class StorageParams:
     timeout: int = field(default=300)
 
 
+@dataclass
+class CkksParams:
+    """CKKS key-file locations and encoding configuration.
+
+    Attributes:
+        keys_path: Directory that holds CKKS key files — required for ``put`` with
+            ``encrypt=True`` (keys are loaded once per worker process).
+        ctx_filename: CKKS context filename inside ``keys_path``.
+        pubkey_filename: Public key filename.
+        secretkey_filename: Secret key filename.
+        relinkey_filename: Relinearization key filename.
+        rotatekey_filename: Rotation key filename.
+        decimals: Fixed-point precision for CKKS encoding.
+        _round: Round values after CKKS decoding.
+    """
+    keys_path:          str
+    ctx_filename:       str  = "ctx"
+    pubkey_filename:    str  = "pubkey"
+    secretkey_filename: str  = "secretkey"
+    relinkey_filename:  str  = ""
+    rotatekey_filename: str  = ""
+    decimals:           int  = 2
+    _round:             bool = False
+
+
+@dataclass
+class LiuParams:
+    """Liu-scheme construction parameters.
+
+    Holds everything needed to build a ``DataOwner`` inside each worker process,
+    avoiding pickling of the ``DataOwner`` object on every task submission.
+
+    Attributes:
+        _round: Round values after Liu decoding.
+        decimals: Fixed-point decimal precision.
+        secure_random: Use a cryptographically secure RNG.
+        seed: RNG seed — shared across all workers; derive per-worker if correlated
+            randomness is a concern.
+        use_np_random: Use numpy's RNG inside the Liu scheme.
+        security_level: Security level in bits.
+    """
+    _round:         bool = False
+    decimals:       int  = 2
+    secure_random:  bool = False
+    seed:           int  = 1
+    use_np_random:  bool = True
+    security_level: int  = 128
+
 
 
 
@@ -89,10 +139,8 @@ class StorageBuilder:
     Example:
         ```python
         backend = (
-            StorageBuilder(storage_client=client, algorithm=Algorithm.CKKS, ckks=ckks,
-                           keys_path="/rory/keys", ctx_filename="ctx",
-                           pubkey_filename="pubkey", secretkey_filename="secretkey",
-                           relinkey_filename="relinkey", rotatekey_filename="rotatekey")
+            StorageBuilder(storage_client=client, algorithm=Algorithm.CKKS, ckks=ckks)
+            .with_ckks_params(CkksParams(keys_path="/rory/keys"))
             .with_storage_params(StorageParams(num_chunks=4))
             .build()
         )
@@ -104,53 +152,29 @@ class StorageBuilder:
         storage_client: AsyncClient,
         algorithm: Algorithm,
         ckks: Optional[Ckks] = None,
-        dataowner: Optional[DataOwner] = None,
-        dataowner_phe: Optional[DataOwnerPHE] = None,
+        ckks_params: Optional[CkksParams] = None,
+        liu_params: Optional[LiuParams] = None,
         params: Optional[StorageParams] = None,
-        keys_path: Optional[str] = None,
-        ctx_filename: str = "ctx",
-        pubkey_filename: str = "pubkey",
-        secretkey_filename: str = "secretkey",
-        relinkey_filename: str = "relinkey",
-        rotatekey_filename: str = "rotatekey",
-        decimals: int = 2,
-        _round: bool = False,
     ):
         """
         Args:
             storage_client: Async mictlanx client used for all I/O.
             algorithm: Encryption scheme (``Algorithm.CKKS`` or ``Algorithm.LIU``).
             ckks: Pre-built ``Ckks`` context — required for CKKS ``get`` (deserialization).
-            dataowner: Liu-scheme data owner — required for LIU ``put`` with ``encrypt=True``.
-            dataowner_phe: Paillier data owner (reserved, not yet used).
+            ckks_params: CKKS key-file locations and encoding config — required for CKKS
+                ``put`` with ``encrypt=True``.
+            liu_params: Liu-scheme construction params — required for LIU ``put`` with
+                ``encrypt=True``.
             params: Retrieval/upload tuning. Defaults to ``StorageParams()``.
-            keys_path: Directory that holds CKKS key files — required for CKKS ``put`` with
-                ``encrypt=True`` (keys are loaded in each worker process to avoid pickling
-                the large PyFHEL context).
-            ctx_filename: CKKS context filename inside ``keys_path``.
-            pubkey_filename: Public key filename.
-            secretkey_filename: Secret key filename.
-            relinkey_filename: Relinearization key filename.
-            rotatekey_filename: Rotation key filename.
-            decimals: Fixed-point precision for CKKS encoding.
-            _round: Round values after CKKS decoding.
         """
-        self.storage_client    = storage_client
-        self.algorithm         = algorithm
-        self.ckks              = ckks
-        self.dataowner         = dataowner
-        self.dataowner_phe     = dataowner_phe
-        self.params            = params or StorageParams()
-        self.keys_path         = keys_path
-        self.ctx_filename      = ctx_filename
-        self.pubkey_filename   = pubkey_filename
-        self.secretkey_filename = secretkey_filename
-        self.relinkey_filename  = relinkey_filename
-        self.rotatekey_filename = rotatekey_filename
-        self.decimals          = decimals
-        self._round            = _round
+        self.storage_client = storage_client
+        self.algorithm      = algorithm
+        self.ckks           = ckks
+        self.ckks_params    = ckks_params
+        self.liu_params     = liu_params
+        self.params         = params or StorageParams()
 
-    def with_ckks(self, ckks: Ckks) -> Self :
+    def with_ckks(self, ckks: Ckks) -> Self:
         """Replace the CKKS context and return ``self`` for chaining.
 
         Args:
@@ -162,19 +186,31 @@ class StorageBuilder:
         self.ckks = ckks
         return self
 
-    def with_dataowner(self, dataowner: DataOwner) -> Self:
-        """Replace the Liu-scheme data owner and return ``self`` for chaining.
+    def with_ckks_params(self, ckks_params: CkksParams) -> Self:
+        """Replace the CKKS params and return ``self`` for chaining.
 
         Args:
-            dataowner: New ``DataOwner`` instance used for Liu encryption/decryption.
+            ckks_params: New ``CkksParams`` instance.
 
         Returns:
             StorageBuilder
         """
-        self.dataowner = dataowner
+        self.ckks_params = ckks_params
         return self
 
-    def with_algorithm(self, algorithm: Algorithm)->Self:
+    def with_liu_params(self, liu_params: LiuParams) -> Self:
+        """Replace the Liu params and return ``self`` for chaining.
+
+        Args:
+            liu_params: New ``LiuParams`` instance.
+
+        Returns:
+            StorageBuilder
+        """
+        self.liu_params = liu_params
+        return self
+
+    def with_algorithm(self, algorithm: Algorithm) -> Self:
         """Replace the algorithm and return ``self`` for chaining.
 
         Args:
@@ -205,20 +241,12 @@ class StorageBuilder:
             A ready-to-use ``StorageBackend``.
         """
         return StorageBackend(
-            client             = self.storage_client,
-            algorithm          = self.algorithm,
-            ckks               = self.ckks,
-            dataowner          = self.dataowner,
-            dataowner_phe      = self.dataowner_phe,
-            params             = self.params,
-            keys_path          = self.keys_path,
-            ctx_filename       = self.ctx_filename,
-            pubkey_filename    = self.pubkey_filename,
-            secretkey_filename = self.secretkey_filename,
-            relinkey_filename  = self.relinkey_filename,
-            rotatekey_filename = self.rotatekey_filename,
-            decimals           = self.decimals,
-            _round             = self._round,
+            client      = self.storage_client,
+            algorithm   = self.algorithm,
+            ckks        = self.ckks,
+            ckks_params = self.ckks_params,
+            liu_params  = self.liu_params,
+            params      = self.params,
         )
 
 
@@ -248,32 +276,16 @@ class StorageBackend:
         client: AsyncClient,
         algorithm: Algorithm,
         ckks: Optional[Ckks] = None,
-        dataowner: Optional[DataOwner] = None,
-        dataowner_phe: Optional[DataOwnerPHE] = None,
+        ckks_params: Optional[CkksParams] = None,
+        liu_params: Optional[LiuParams] = None,
         params: Optional[StorageParams] = None,
-        keys_path: Optional[str] = None,
-        ctx_filename: str = "ctx",
-        pubkey_filename: str = "pubkey",
-        secretkey_filename: str = "secretkey",
-        relinkey_filename: str = "relinkey",
-        rotatekey_filename: str = "rotatekey",
-        decimals: int = 2,
-        _round: bool = False,
     ):
-        self.client             = client
-        self.algorithm          = algorithm
-        self.ckks               = ckks
-        self.dataowner          = dataowner
-        self.dataowner_phe      = dataowner_phe
-        self.params             = params or StorageParams()
-        self.keys_path          = keys_path
-        self.ctx_filename       = ctx_filename
-        self.pubkey_filename    = pubkey_filename
-        self.secretkey_filename = secretkey_filename
-        self.relinkey_filename  = relinkey_filename
-        self.rotatekey_filename = rotatekey_filename
-        self.decimals           = decimals
-        self._round             = _round
+        self.client      = client
+        self.algorithm   = algorithm
+        self.ckks        = ckks
+        self.ckks_params = ckks_params
+        self.liu_params  = liu_params
+        self.params      = params or StorageParams()
 
     def as_builder(self) -> StorageBuilder:
         """Return a ``StorageBuilder`` pre-populated with this backend's configuration.
@@ -287,7 +299,7 @@ class StorageBackend:
             liu_backend = (
                 ckks_backend.as_builder()
                 .with_algorithm(Algorithm.LIU)
-                .with_dataowner(dataowner)
+                .with_liu_params(LiuParams())
                 .build()
             )
             ```
@@ -296,20 +308,12 @@ class StorageBackend:
             StorageBuilder
         """
         return StorageBuilder(
-            storage_client     = self.client,
-            algorithm          = self.algorithm,
-            ckks               = self.ckks,
-            dataowner          = self.dataowner,
-            dataowner_phe      = self.dataowner_phe,
-            params             = self.params,
-            keys_path          = self.keys_path,
-            ctx_filename       = self.ctx_filename,
-            pubkey_filename    = self.pubkey_filename,
-            secretkey_filename = self.secretkey_filename,
-            relinkey_filename  = self.relinkey_filename,
-            rotatekey_filename = self.rotatekey_filename,
-            decimals           = self.decimals,
-            _round             = self._round,
+            storage_client = self.client,
+            algorithm      = self.algorithm,
+            ckks           = self.ckks,
+            ckks_params    = self.ckks_params,
+            liu_params     = self.liu_params,
+            params         = self.params,
         )
 
     async def put(
@@ -374,7 +378,7 @@ class StorageBackend:
                 ))
 
             # Pre-processed Chunks — put_chunks directly
-            if isinstance(data, Chunks) and not segment and not encrypt:
+            if isinstance(data, Chunks) and not encrypt:
                 r = await Common.put_chunks(
                     client=self.client, bucket_id=bucket_id, key=ball_id,
                     chunks=data, tags=tags, timeout=p.timeout, max_retries=p.max_attempts,
@@ -391,56 +395,57 @@ class StorageBackend:
             ckks_predicate = isinstance(data, np.ndarray) and encrypt and _algorithm == Algorithm.CKKS
             liu_predicate = isinstance(data, np.ndarray) and encrypt and _algorithm == Algorithm.LIU
             if ckks_predicate:
+                if self.ckks_params is None:
+                    return Err(ValueError("ckks_params is required for encrypted CKKS put"))
                 return await Common.from_matrix_to_cloud_storage_ckks(
                     plaintext_matrix   = data,
                     client             = self.client,
                     bucket_id          = bucket_id,
                     ball_id            = ball_id,
-                    keys_path          = self.keys_path,
-                    ctx_filename       = self.ctx_filename,
-                    relinkey_filename  = self.relinkey_filename,
-                    rotatekey_filename = self.rotatekey_filename,
-                    secretkey_filename = self.secretkey_filename,
-                    decimals           = self.decimals,
+                    keys_path          = self.ckks_params.keys_path,
+                    ctx_filename       = self.ckks_params.ctx_filename,
+                    relinkey_filename  = self.ckks_params.relinkey_filename,
+                    rotatekey_filename = self.ckks_params.rotatekey_filename,
+                    secretkey_filename = self.ckks_params.secretkey_filename,
+                    decimals           = self.ckks_params.decimals,
                     num_chunks         = p.num_chunks,
-                    pubkey_filename    = self.pubkey_filename,
+                    pubkey_filename    = self.ckks_params.pubkey_filename,
                     tags               = tags,
                     timeout            = p.timeout,
                     max_attempts       = p.max_attempts,
-                    _round             = self._round,
+                    _round             = self.ckks_params._round,
                 )
             if liu_predicate:
-                    t0 = T.monotonic()
-                    with ProcessPoolExecutor(max_workers=p.num_chunks) as executor:
-                        encrypted_chunks = Common.segment_and_encrypt_liu_with_executor(
-                            executor         = executor,
-                            key              = ball_id,
-                            dataowner        = self.dataowner,
-                            plaintext_matrix = data,
-                            n                = data.size,
-                            np_random        = True,
-                            num_chunks       = p.num_chunks,
-                        )
-                    encrypt_time = T.monotonic() - t0
-                    r = await Common.put_chunks(
-                        client=self.client, bucket_id=bucket_id, key=ball_id,
-                        chunks=encrypted_chunks, tags=tags, timeout=p.timeout, max_retries=p.max_attempts,
-                    )
-                    if r.is_err:
-                        return r
-                    return Ok(PutCiphertextResult(
-                        path         = None,
-                        extension    = "",
-                        bucket_id    = bucket_id,
-                        ball_id      = ball_id,
-                        tags         = tags,
-                        shape        = data.shape,
-                        dtype        = data.dtype,
-                        read_time    = 0.0,
-                        segment_time = 0.0,
-                        upload_time  = T.monotonic() - t0,
-                        encrypt_time = encrypt_time,
-                    ))
+                if self.liu_params is None:
+                    return Err(ValueError("liu_params is required for encrypted LIU put"))
+                (encrypted_chunks, segment_time, encrypt_time) = Common.segment_and_encrypt_liu_with_initialized_executor_timed(
+                    key              = ball_id,
+                    plaintext_matrix = data,
+                    n                = data.size,
+                    np_random        = True,
+                    liu_params       = self.liu_params,
+                    num_chunks       = p.num_chunks,
+                )
+                t1 = T.monotonic()
+                r = await Common.put_chunks(
+                    client=self.client, bucket_id=bucket_id, key=ball_id,
+                    chunks=encrypted_chunks, tags=tags, timeout=p.timeout, max_retries=p.max_attempts,
+                )
+                if r.is_err:
+                    return r
+                return Ok(PutCiphertextResult(
+                    path         = None,
+                    extension    = "",
+                    bucket_id    = bucket_id,
+                    ball_id      = ball_id,
+                    tags         = tags,
+                    shape        = data.shape,
+                    dtype        = data.dtype,
+                    read_time    = 0.0,
+                    segment_time = segment_time,
+                    encrypt_time = encrypt_time,
+                    upload_time  = T.monotonic() - t1,
+                ))
 
             # ndarray + segment=True, encrypt=False → Chunks.from_ndarray → put_chunks
             if segment and not encrypt and isinstance(data, np.ndarray):
@@ -521,20 +526,22 @@ class StorageBackend:
             p = self.params
             # CKKS encrypt: dedicated disk→segment→encrypt→put method
             if encrypt and self.algorithm == Algorithm.CKKS:
+                if self.ckks_params is None:
+                    return Err(ValueError("ckks_params is required for encrypted CKKS put_from_file"))
                 return await Common.from_matrix_on_disk_to_cloud_storage_ckks(
                     path               = path,
                     extension          = extension,
                     client             = self.client,
                     bucket_id          = bucket_id,
                     ball_id            = ball_id,
-                    keys_path          = self.keys_path,
-                    ctx_filename       = self.ctx_filename,
-                    relinkey_filename  = self.relinkey_filename,
-                    rotatekey_filename = self.rotatekey_filename,
-                    secretkey_filename = self.secretkey_filename,
-                    decimals           = self.decimals,
+                    keys_path          = self.ckks_params.keys_path,
+                    ctx_filename       = self.ckks_params.ctx_filename,
+                    relinkey_filename  = self.ckks_params.relinkey_filename,
+                    rotatekey_filename = self.ckks_params.rotatekey_filename,
+                    secretkey_filename = self.ckks_params.secretkey_filename,
+                    decimals           = self.ckks_params.decimals,
                     num_chunks         = p.num_chunks,
-                    pubkey_filename    = self.pubkey_filename,
+                    pubkey_filename    = self.ckks_params.pubkey_filename,
                     tags               = tags,
                     timeout            = p.timeout,
                     max_attempts       = p.max_attempts,
@@ -669,8 +676,9 @@ class Common:
     - **Low-level I/O** — ``put_ndarray``, ``put_chunks``, ``delete_and_put_*``
     """
     
-    ckks = None 
+    ckks = None
     dataowner = None
+    liu_dataowner = None
 
 
     # Plain text
@@ -1640,6 +1648,10 @@ class Common:
     def segment_and_encrypt_liu(key:str,dataowner:DataOwner,plaintext_matrix:npt.NDArray, n:int, np_random:bool, num_chunks:int=2,max_workers:int = int(os.cpu_count()/2))->Chunks:
         """Segment a matrix and Liu-encrypt each chunk using an internal process pool.
 
+        .. deprecated::
+            Use ``StorageBackend.put`` with ``Algorithm.LIU`` instead.
+            Will be removed in rory-common 1.0.0.
+
         Args:
             key: Object key — used as the ``group_id`` for chunk metadata.
             dataowner: Liu-scheme data owner that performs the per-chunk encryption.
@@ -1652,6 +1664,12 @@ class Common:
         Returns:
             ``Chunks`` object whose iterator yields encrypted ``Chunk`` instances.
         """
+        warnings.warn(
+            "segment_and_encrypt_liu is deprecated and will be removed in rory-common 1.0.0. "
+            "Use StorageBackend.put with Algorithm.LIU instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         plaintext_matrix_chunks = Chunks.from_ndarray(ndarray= plaintext_matrix, group_id = key, num_chunks= num_chunks).unwrap()
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             awaitable_chunks:List[Awaitable[Chunk]] = []
@@ -1665,8 +1683,9 @@ class Common:
     def segment_and_encrypt_liu_with_executor(executor:ProcessPoolExecutor,key:str,dataowner:DataOwner,plaintext_matrix:npt.NDArray, n:int, np_random:bool, num_chunks:int=2 )->Chunks:
         """Segment a matrix and Liu-encrypt each chunk using a caller-supplied executor.
 
-        Prefer this over ``segment_and_encrypt_liu`` when the caller already owns
-        a ``ProcessPoolExecutor`` (e.g. ``StorageBackend.put``).
+        .. deprecated::
+            Use ``StorageBackend.put`` with ``Algorithm.LIU`` instead.
+            Will be removed in rory-common 1.0.0.
 
         Args:
             executor: Running ``ProcessPoolExecutor`` to submit work to.
@@ -1680,6 +1699,12 @@ class Common:
         Returns:
             Chunks: object whose iterator yields encrypted Chunk instances.
         """
+        warnings.warn(
+            "segment_and_encrypt_liu_with_executor is deprecated and will be removed in rory-common 1.0.0. "
+            "Use StorageBackend.put with Algorithm.LIU instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         plaintext_matrix_chunks:Chunks = Chunks.from_ndarray(ndarray= plaintext_matrix, group_id = key, num_chunks= num_chunks).unwrap()
         awaitable_chunks:List[Awaitable[Chunk]] = []
         for plaintext_matrix_chunk in plaintext_matrix_chunks.iter():
@@ -1687,7 +1712,185 @@ class Common:
             awaitable_chunks.append(future)
         return Chunks(chs= Common.to_chunks_generator(awaitable_chunks=awaitable_chunks),n =n  )
 
+    @staticmethod
+    def segment_and_encrypt_liu_timed(
+        key: str,
+        dataowner: DataOwner,
+        plaintext_matrix: npt.NDArray,
+        n: int,
+        np_random: bool,
+        num_chunks: int = 2,
+        max_workers: int = int(os.cpu_count() / 2),
+    ) -> Tuple[Chunks, float, float]:
+        """Segment a matrix and Liu-encrypt each chunk using an internal process pool.
+
+        Returns timing data alongside the encrypted chunks, matching the pattern of
+        ``segment_and_encrypt_ckks_with_initialized_executor``.
+
+        Args:
+            key: Object key — used as the ``group_id`` for chunk metadata.
+            dataowner: Liu-scheme data owner that performs the per-chunk encryption.
+            plaintext_matrix: Matrix to segment and encrypt.
+            n: Total number of elements (``matrix.size``) — stored in ``Chunks.n``.
+            np_random: Use numpy's random number generator inside the Liu scheme.
+            num_chunks: Number of chunks to split the matrix into.
+            max_workers: Process pool size (defaults to half the CPU count).
+
+        Returns:
+            Tuple of ``(Chunks, segment_time, encrypt_time)`` where times are in seconds.
+        """
+        t0 = T.monotonic()
+        plaintext_matrix_chunks = Chunks.from_ndarray(ndarray=plaintext_matrix, group_id=key, num_chunks=num_chunks).unwrap()
+        t1 = T.monotonic()
+        segment_time = t1 - t0
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+            awaitable_chunks: List[Awaitable[Chunk]] = []
+            for plaintext_matrix_chunk in plaintext_matrix_chunks.iter():
+                future = executor.submit(Common.encrypt_chunk_liu, key=key, dataowner=dataowner, chunk=plaintext_matrix_chunk, np_random=np_random)
+                awaitable_chunks.append(future)
+            chs = Common.to_chunks_generator(awaitable_chunks=awaitable_chunks)
+        encrypt_time = T.monotonic() - t1
+        return (Chunks(chs=chs, n=n), segment_time, encrypt_time)
+
+    @staticmethod
+    def segment_and_encrypt_liu_with_executor_timed(
+        executor: ProcessPoolExecutor,
+        key: str,
+        dataowner: DataOwner,
+        plaintext_matrix: npt.NDArray,
+        n: int,
+        np_random: bool,
+        num_chunks: int = 2,
+    ) -> Tuple[Chunks, float, float]:
+        """Segment a matrix and Liu-encrypt each chunk using a caller-supplied executor.
+
+        Prefer this over ``segment_and_encrypt_liu_timed`` when the caller already owns
+        a ``ProcessPoolExecutor`` (e.g. ``StorageBackend.put``). Returns timing data
+        alongside the encrypted chunks, matching the pattern of
+        ``segment_and_encrypt_ckks_with_initialized_executor``.
+
+        Args:
+            executor: Running ``ProcessPoolExecutor`` to submit work to.
+            key: Object key — used as the ``group_id`` for chunk metadata.
+            dataowner: Liu-scheme data owner that performs the per-chunk encryption.
+            plaintext_matrix: Matrix to segment and encrypt.
+            n: Total number of elements (``matrix.size``) — stored in ``Chunks.n``.
+            np_random: Use numpy's random number generator inside the Liu scheme.
+            num_chunks: Number of chunks to split the matrix into.
+
+        Returns:
+            Tuple of ``(Chunks, segment_time, encrypt_time)`` where times are in seconds.
+        """
+        t0 = T.monotonic()
+        plaintext_matrix_chunks: Chunks = Chunks.from_ndarray(ndarray=plaintext_matrix, group_id=key, num_chunks=num_chunks).unwrap()
+        t1 = T.monotonic()
+        segment_time = t1 - t0
+        awaitable_chunks: List[Awaitable[Chunk]] = []
+        for plaintext_matrix_chunk in plaintext_matrix_chunks.iter():
+            future = executor.submit(Common.encrypt_chunk_liu, key=key, dataowner=dataowner, chunk=plaintext_matrix_chunk, np_random=np_random)
+            awaitable_chunks.append(future)
+        chs = Common.to_chunks_generator(awaitable_chunks=awaitable_chunks)
+        encrypt_time = T.monotonic() - t1
+        return (Chunks(chs=chs, n=n), segment_time, encrypt_time)
+
     
+    @staticmethod
+    def init_liu_worker_context(liu_params: "LiuParams"):
+        """Runs once per worker process to construct the Liu DataOwner into RAM.
+
+        Args:
+            liu_params: Liu scheme construction parameters.
+        """
+        try:
+            global liu_dataowner
+            _liu = Liu(
+                _round         = liu_params._round,
+                decimals       = liu_params.decimals,
+                secure_random  = liu_params.secure_random,
+                seed           = liu_params.seed,
+                use_np_random  = liu_params.use_np_random,
+                security_level = liu_params.security_level,
+            )
+            liu_dataowner = DataOwner(liu_scheme=_liu)
+        except Exception as e:
+            print(f"Failed to initialize Liu worker context: {e}")
+            raise e
+
+    @staticmethod
+    def encrypt_chunk_liu_with_initialized_executor(key: str, chunk: Chunk, np_random: bool) -> Chunk:
+        """Encrypt a single chunk using the pre-initialized Liu DataOwner in this worker process.
+
+        Must be run inside a ``ProcessPoolExecutor`` whose ``initializer`` was
+        ``init_liu_worker_context``.
+
+        Args:
+            key: Object key — used as the ``group_id`` for chunk metadata.
+            chunk: Plaintext chunk to encrypt.
+            np_random: Use numpy's random number generator inside the Liu scheme.
+
+        Returns:
+            Encrypted ``Chunk``.
+        """
+        try:
+            _ldo = globals().get("liu_dataowner")
+            if _ldo is None:
+                raise Exception("Liu dataowner not initialized. Please run init_liu_worker_context first.")
+            ptm = chunk.to_ndarray().unwrap()
+            encrypted: npt.NDArray = _ldo.liu_encrypt_matrix_chunk(plaintext_matrix=ptm, np_random=np_random)
+            return Chunk.from_ndarray(group_id=key, index=chunk.index, ndarray=encrypted, chunk_id=Some("{}_{}".format(key, chunk.index)))
+        except Exception as e:
+            print("ENCRYPT_CHUNK_LIU_ERROR", e)
+            raise e
+
+    @staticmethod
+    def segment_and_encrypt_liu_with_initialized_executor_timed(
+        key: str,
+        plaintext_matrix: npt.NDArray,
+        n: int,
+        np_random: bool,
+        liu_params: "LiuParams",
+        num_chunks: int = 2,
+    ) -> Tuple[Chunks, float, float]:
+        """Segment a matrix and Liu-encrypt each chunk using a process pool with pre-initialized DataOwner.
+
+        Each worker loads the Liu context once via ``init_liu_worker_context`` rather than
+        pickling a ``DataOwner`` object for every task — mirrors the CKKS
+        ``segment_and_encrypt_ckks_with_initialized_executor`` pattern.
+
+        Args:
+            key: Object key — used as the ``group_id`` for chunk metadata.
+            plaintext_matrix: Matrix to segment and encrypt.
+            n: Total number of elements (``matrix.size``) — stored in ``Chunks.n``.
+            np_random: Use numpy's random number generator inside the Liu scheme.
+            liu_params: Liu scheme construction parameters forwarded to workers.
+            num_chunks: Number of chunks (also the process pool size).
+
+        Returns:
+            Tuple of ``(Chunks, segment_time, encrypt_time)`` where times are in seconds.
+        """
+        t0 = T.monotonic()
+        executor = ProcessPoolExecutor(
+            max_workers = num_chunks,
+            initializer = Common.init_liu_worker_context,
+            initargs    = (liu_params,),
+        )
+        plaintext_matrix_chunks = Chunks.from_ndarray(ndarray=plaintext_matrix, group_id=key, num_chunks=num_chunks).unwrap()
+        t1 = T.monotonic()
+        segment_time = t1 - t0
+        awaitable_chunks: List[Awaitable[Chunk]] = []
+        for plaintext_matrix_chunk in plaintext_matrix_chunks.iter():
+            future = executor.submit(
+                Common.encrypt_chunk_liu_with_initialized_executor,
+                key       = key,
+                chunk     = plaintext_matrix_chunk,
+                np_random = np_random,
+            )
+            awaitable_chunks.append(future)
+        chs = Common.to_chunks_generator(awaitable_chunks=awaitable_chunks)
+        encrypt_time = T.monotonic() - t1
+        executor.shutdown(wait=False)
+        return (Chunks(chs=chs, n=n), segment_time, encrypt_time)
+
     @staticmethod
     def segment_and_encrypt_fdhope(algorithm:str, key:str,dataowner:DataOwner,plaintext_matrix:npt.NDArray, n:int ,num_chunks:int=2, threshold:float = 0.0, max_workers:int = int(os.cpu_count()/2) )->Chunks:
         plaintext_matrix_chunks = Chunks.from_ndarray(ndarray= plaintext_matrix, group_id = key, num_chunks= num_chunks).unwrap()
