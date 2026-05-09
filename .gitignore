@@ -6,3 +6,6 @@ dist/
 site/
 htmlcov/
 .vscode/
+CLAUDE.md
+.claude
+.cache
