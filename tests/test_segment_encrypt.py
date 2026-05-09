@@ -99,7 +99,7 @@ async def test_segement_ckks_encrypt_with_initialized_executor(generated_matrix:
     RORY_KEYS_PATH                 = get_context["keys_path"]
 
     n          = generated_matrix.shape[1]*generated_matrix.shape[1]
-    emt = RoryCommon.segment_and_encrypt_ckks_with_initialized_executor(
+    (emt,_,_) = RoryCommon.segment_and_encrypt_ckks_with_initialized_executor(
         key                = key,
         plaintext_matrix   = generated_matrix,
         n                  = n,
@@ -135,7 +135,7 @@ async def test_segement_ckks_encrypt_put_chunks_with_initialized_executor(
     decimals = 2
 
     n          = generated_matrix.shape[1]*generated_matrix.shape[1]
-    emt = await RoryCommon.segement_and_encrypt_ckks_with_initialized_executor_put_chunks(
+    (emt,_,_,_) = await RoryCommon.segement_and_encrypt_ckks_with_initialized_executor_put_chunks(
         client             = client,
         bucket_id          = bucket_id,
         ball_id            = ball_id,

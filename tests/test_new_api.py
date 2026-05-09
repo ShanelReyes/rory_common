@@ -88,7 +88,7 @@ async def test_integration_plaintext_matrix_to_cloud_and_back(real_matrix, test_
     
     assert download_result.is_ok
     downloaded_matrix = download_result.unwrap()
-    assert np.allclose(real_matrix, downloaded_matrix)
+    assert np.allclose(real_matrix, downloaded_matrix.raw_value)
 
 
 # -----------------------------------------------------------------------------
@@ -115,7 +115,7 @@ async def test_integration_ckks_vector_disk_to_cloud(tmp_path, test_env_args, ck
     file_path = tmp_path / "test_vector.npy"
     np.save(file_path, vector)
     
-    result = await RoryCommon.from_vector_ondisk_to_cloud_storage_ckks(
+    result = await RoryCommon.from_vector_on_disk_to_cloud_storage_ckks(
         path      = str(file_path),
         extension = "npy",
         _round    = False,

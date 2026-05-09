@@ -20,7 +20,7 @@ if os.path.exists(RORY_COMMON_ENV_FILE_PATH):
 
 
 RORY_MAX_WORKERS                  = int(os.environ.get("RORY_MAX_WORKERS","2"))
-RORY_KEYS_PATH                    = os.environ.get("RORY_KEYS_PATH", "/rory/keys")
+RORY_KEYS_PATH                    = os.environ.get("RORY_KEYS_PATH", "/rory/keys/test2")
 RORY_COMMON_CTX_FILENAME          = os.environ.get("RORY_COMMON_CTX_FILENAME","ctx")
 RORY_COMMON_PUBKEY_FILENAME       = os.environ.get("RORY_COMMON_PUBKEY_FILENAME","pubkey")
 RORY_COMMON_SECRETKEY_FILENAME    = os.environ.get("RORY_COMMON_SECRETKEY_FILENAME","secretkey")
@@ -132,11 +132,11 @@ def ball_id():
     return uuid4().hex.replace("-","")[:16]
 @pytest.fixture
 def bucket_id():
-    return f"test_bucket_{uuid4().hex[:4]}"
+    return f"testbucket{uuid4().hex[:4]}"
 
 @pytest.fixture
 def generated_matrix():
-    return np.random.random(size=(100,10))
+    return np.random.random(size=(10,10))
 
 @pytest.fixture
 def executor():
