@@ -40,7 +40,8 @@ Fluent builder — chain `.with_*()` calls then `.build()`.
       members:
         - __init__
         - with_ckks
-        - with_dataowner
+        - with_ckks_params
+        - with_liu_params
         - with_algorithm
         - with_storage_params
         - build
@@ -53,6 +54,24 @@ Tuning parameters applied to every put/get call on the backend.
 Pass a custom instance to `StorageBuilder.__init__` or `.with_storage_params()`.
 
 ::: rorycommon.StorageParams
+
+---
+
+## CkksParams
+
+CKKS key-file locations and encoding configuration.
+Required for `StorageBackend.put` with `encrypt=True` on a CKKS backend.
+
+::: rorycommon.CkksParams
+
+---
+
+## LiuParams
+
+Liu-scheme construction parameters.
+Required for `StorageBackend.put` with `encrypt=True` on a LIU backend.
+
+::: rorycommon.LiuParams
 
 ---
 
@@ -89,23 +108,19 @@ Pass a custom instance to `StorageBuilder.__init__` or `.with_storage_params()`.
 
 ### Liu
 
-!!! warning "Missing time measurements — migration required"
-    `segment_and_encrypt_liu` and `segment_and_encrypt_liu_with_executor` return only
-    `Chunks`. Unlike the CKKS helpers (which return `(Chunks, segment_time, encrypt_time)`),
-    no `segment_time` or `encrypt_time` is captured.
-
-    As a consequence, a LIU `put` with `encrypt=True` currently hardcodes
-    `segment_time = 0.0` and omits `encrypt_time` from `PutCiphertextResult` entirely
-    (a `TypeError` at runtime).
-
-    Fixing this requires changing the return type from `Chunks` to
-    `Tuple[Chunks, float, float]`. That is a **breaking change** for any Rory Platform
-    component that calls these functions directly — a coordinated migration is needed
-    before making that change.
+The preferred path is `StorageBackend.put` with `Algorithm.LIU`, which uses the
+initialized-executor pipeline below. The `segment_and_encrypt_liu` and
+`segment_and_encrypt_liu_with_executor` helpers are deprecated and will be removed in
+**rory-common 1.0.0** — they emit a `DeprecationWarning` at runtime.
 
 ::: rorycommon.Common
     options:
       members:
+        - init_liu_worker_context
+        - encrypt_chunk_liu_with_initialized_executor
+        - segment_and_encrypt_liu_with_initialized_executor_timed
+        - segment_and_encrypt_liu_timed
+        - segment_and_encrypt_liu_with_executor_timed
         - segment_and_encrypt_liu
         - segment_and_encrypt_liu_with_executor
 

@@ -26,20 +26,14 @@ StorageBuilder  ──►  StorageBackend  (put / put_from_file / get)
 | Scheme | `Algorithm` value | Description | Status |
 |---|---|---|---|
 | CKKS | `Algorithm.CKKS` | Approximate HE via Pyfhel — initialized-executor pipeline, fully abstracted | Stable |
-| Liu | `Algorithm.LIU` | Symmetric additive HE | **Not fully implemented** — lacks the initialized-executor abstraction; may crash the platform |
-| Paillier | `Algorithm.PAILLIER` | Probabilistic additive HE | Reserved |
+| Liu | `Algorithm.LIU` | Symmetric additive HE | Stable |
+| Paillier | `Algorithm.PAILLIER` | Probabilistic additive HE | **Not implemented yet** |
 
-!!! warning "LIU stability"
-    The LIU backend does not yet have a proper initialized-executor abstraction equivalent to
-    CKKS. Calling `put` with `encrypt=True` on a LIU backend can cause crashes in the Rory
-    platform. Use CKKS for production workloads until LIU is fully generalized.
-
-    Additionally, the Liu helpers (`segment_and_encrypt_liu[_with_executor]`) return only
-    `Chunks` — no `segment_time` or `encrypt_time` is measured. The `PutCiphertextResult`
-    produced by a LIU `put` hardcodes `segment_time = 0.0` and is missing `encrypt_time`
-    entirely, which causes a `TypeError` at runtime. Aligning Liu with the CKKS timing model
-    requires changing the return type from `Chunks` to `Tuple[Chunks, float, float]` — a
-    breaking change that must be carefully coordinated across the Rory Platform.
+!!! note "Deprecated Liu helpers"
+    The legacy `Common` helpers `segment_and_encrypt_liu` and
+    `segment_and_encrypt_liu_with_executor` are deprecated — they emit a `DeprecationWarning`
+    and will be removed in rory-common 1.0.0. Use `StorageBackend.put` with `Algorithm.LIU`
+    instead.
 
 ## Quick start
 
@@ -69,17 +63,19 @@ matrix = np.random.random((64, 64))
 
     ```python
     backend = StorageBuilder(
-        storage_client     = client,
-        algorithm          = Algorithm.CKKS,
-        ckks               = ckks,
-        keys_path          = "/rory/keys",
-        ctx_filename       = "ctx",
-        pubkey_filename    = "pubkey",
-        secretkey_filename = "secretkey",
-        relinkey_filename  = "relinkey",
-        rotatekey_filename = "rotatekey",
-        decimals           = 2,
-        _round             = True,
+        storage_client = client,
+        algorithm      = Algorithm.CKKS,
+        ckks           = ckks,
+        ckks_params    = CkksParams(
+            keys_path          = "/rory/keys",
+            ctx_filename       = "ctx",
+            pubkey_filename    = "pubkey",
+            secretkey_filename = "secretkey",
+            relinkey_filename  = "relinkey",
+            rotatekey_filename = "rotatekey",
+            decimals           = 2,
+            _round             = True,
+        ),
     ).build()
     ```
 
@@ -133,15 +129,12 @@ ckks_backend = (
 liu_backend = (
     ckks_backend.as_builder()
     .with_algorithm(Algorithm.LIU)
-    .with_dataowner(dataowner)
+    .with_liu_params(LiuParams(security_level=128, decimals=2, _round=True))
     .build()
 )
 
 result = await liu_backend.put(bucket_id="rory", ball_id="model_liu", data=matrix, encrypt=True)
 ```
-
-!!! warning
-    LIU `put` with `encrypt=True` is not yet stable. See [Supported encryption schemes](#supported-encryption-schemes).
 
 ## Generating CKKS keys
 
