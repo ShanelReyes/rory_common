@@ -3,7 +3,7 @@ import os
 import pytest
 import numpy as np
 from mictlanx import AsyncClient
-from rorycommon import Common as RoryCommon, CkksParams, LiuParams
+from rorycommon import Common as RoryCommon, CkksParams, LiuParams, FdhopeParams
 from concurrent.futures import ProcessPoolExecutor
 from rory.core.security.dataowner import DataOwner
 from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
@@ -136,6 +136,20 @@ def ckks_params():
 @pytest.fixture
 def liu_params():
     return LiuParams(
+        _round         = True,
+        decimals       = 2,
+        secure_random  = False,
+        seed           = 1,
+        use_np_random  = True,
+        security_level = 128,
+    )
+
+
+@pytest.fixture
+def fdhope_params():
+    return FdhopeParams(
+        scheme         = "DBSKMEANS",
+        sens           = 0.2,
         _round         = True,
         decimals       = 2,
         secure_random  = False,

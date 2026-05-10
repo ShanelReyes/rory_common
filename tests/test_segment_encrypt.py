@@ -214,15 +214,15 @@ async def test_fdhope(
 
     n          = generated_matrix.shape[1]*generated_matrix.shape[1]*generated_matrix.shape[0]
     sens       = 0.2
-    algorithm  = "DBSKMEANS"
+    scheme  = "DBSKMEANS"
     udm        = dataowner.get_U(
-        algorithm        = algorithm,
+        algorithm     = scheme,
         plaintext_matrix = generated_matrix
     )
     # print(udm)
     emt = RoryCommon.segment_and_encrypt_fdhope_with_executor(
         executor         = executor,
-        algorithm        = algorithm,
+        scheme        = scheme,
         key              = key,
         dataowner        = dataowner,
         matrix           = udm,

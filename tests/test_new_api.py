@@ -8,6 +8,7 @@ from rorycommon import Common as RoryCommon
 # 1. Real Fixtures
 # -----------------------------------------------------------------------------
 
+    
 @pytest.fixture
 def real_matrix():
     """Provides a real numpy array for testing."""
@@ -137,7 +138,7 @@ async def test_integration_ckks_matrix_to_cloud(real_matrix, test_env_args, ckks
     assert result.is_ok
 
 @pytest.mark.asyncio
-async def test_integration_ckks_vector_to_cloud(test_env_args, ckks_keys_args):
+async def test_integration_ckks_vector_to_cloud(test_env_args, ckks_keys_args,ckks):
     vector = np.array([1.5, 2.5, 3.5], dtype=np.float64)
     
     result = await RoryCommon.from_vector_to_cloud_storage_ckks(
@@ -148,3 +149,16 @@ async def test_integration_ckks_vector_to_cloud(test_env_args, ckks_keys_args):
     )
     
     assert result.is_ok
+
+    result = await RoryCommon.get_pyctxt(
+        client=test_env_args["client"],
+        bucket_id=test_env_args["bucket_id"],
+        key=test_env_args["ball_id"],
+        ckks= ckks
+    )
+    assert len(result) == len(vector)
+    # print("VECTOR LEN:", len(vector))
+    # print("ENCRYPTED VECTOR:", len(result))
+    # print("Decrypted vector:", result)
+    # print("Decrypted vector:", result.unwrap())
+    # assert result.is_ok
