@@ -11,15 +11,37 @@ Construct it with `StorageBuilder` — never instantiate directly.
 
 ### put / get flags
 
-`put` and `get` accept two boolean flags that control segmentation and encryption.
-Always use the **same flags** in the `get` call that you used in `put`.
+`put` and `get` accept boolean flags that control segmentation, encryption, and pre-upload deletion.
+Always use the **same `encrypt` and `segment` flags** in the `get` call that you used in `put`.
 
-| `encrypt` | `segment` | algorithm | What happens |
-|---|---|---|---|
-| `False` | `False` | any | Single blob, no encryption |
-| `False` | `True` | any | Split into `num_chunks` plaintext chunks |
-| `True` | — | CKKS | CKKS-encrypt each chunk (keys loaded from disk per worker) |
-| `True` | — | LIU | Liu-encrypt each chunk via a process pool |
+| `data` type | `encrypt` | `segment` | `data.ndim` | scheme | What happens |
+|---|---|---|---|---|---|
+| `str` (file path) | any | any | — | any | Extension derived from path suffix; delegates to `put_from_file` |
+| `ndarray` | `False` | `False` | any | any | Single blob, no encryption |
+| `ndarray` | `False` | `True` | any | any | Split into `num_chunks` plaintext chunks |
+| `ndarray` | `True` | — | 1 | CKKS | Encrypt the whole vector as one ciphertext chunk |
+| `ndarray` | `True` | — | ≥2 | CKKS | CKKS-encrypt each chunk (keys loaded from disk per worker) |
+| `ndarray` | `True` | — | any | LIU | Liu-encrypt each chunk via an initialized process pool |
+| `ndarray` | `True` | — | any | FDHOPE | Treat input as caller-computed UDM, FDHoPE-encrypt each chunk, then upload |
+
+### FDHOPE contract
+
+FDHOPE follows the same `StorageBuilder`/`StorageBackend` public pattern as CKKS and LIU,
+with one important boundary: the backend does **not** compute `get_U` for you.
+Callers must build the UDM first, then pass that ndarray to `put(..., encrypt=True)`
+on a backend configured with `Scheme.FDHOPE`.
+On the caller side, `get_U` uses its own `algorithm=...` parameter; that is separate
+from `FdhopeParams.scheme`, which configures the backend's FDHOPE chunk-encryption step.
+
+For reads, `get(..., encrypt=True)` on an FDHOPE backend uses the generic
+`get_and_merge(...)` path and returns a merged `ndarray`.
+It does **not** run a separate FDHOPE reconstruction or CKKS-style ciphertext loader.
+
+#### `delete` flag
+
+Pass `delete=True` to `put` or `put_from_file` to remove any existing object at `ball_id`
+before uploading. Safe when the key does not yet exist — the delete step completes
+immediately with zero deletions and the upload proceeds normally.
 
 ::: rorycommon.StorageBackend
     options:
@@ -41,8 +63,9 @@ Fluent builder — chain `.with_*()` calls then `.build()`.
         - __init__
         - with_ckks
         - with_ckks_params
+        - with_fdhope_params
         - with_liu_params
-        - with_algorithm
+        - with_scheme
         - with_storage_params
         - build
 
@@ -75,9 +98,18 @@ Required for `StorageBackend.put` with `encrypt=True` on a LIU backend.
 
 ---
 
-## Algorithm
+## FdhopeParams
 
-::: rorycommon.Algorithm
+FDHOPE scheme construction parameters.
+Required for `StorageBackend.put` with `encrypt=True` on an FDHOPE backend.
+
+::: rorycommon.FdhopeParams
+
+---
+
+## Scheme
+
+::: rorycommon.Scheme
 
 ---
 
@@ -108,7 +140,7 @@ Required for `StorageBackend.put` with `encrypt=True` on a LIU backend.
 
 ### Liu
 
-The preferred path is `StorageBackend.put` with `Algorithm.LIU`, which uses the
+The preferred path is `StorageBackend.put` with `Scheme.LIU`, which uses the
 initialized-executor pipeline below. The `segment_and_encrypt_liu` and
 `segment_and_encrypt_liu_with_executor` helpers are deprecated and will be removed in
 **rory-common 1.0.0** — they emit a `DeprecationWarning` at runtime.
@@ -123,6 +155,20 @@ initialized-executor pipeline below. The `segment_and_encrypt_liu` and
         - segment_and_encrypt_liu_with_executor_timed
         - segment_and_encrypt_liu
         - segment_and_encrypt_liu_with_executor
+
+### FDHOPE
+
+The preferred path is `StorageBackend.put` with `Scheme.FDHOPE`, using
+caller-computed UDM input plus the initialized-executor FDHOPE pipeline below.
+`StorageBackend.get(..., encrypt=True)` reads FDHOPE data back through the generic
+`get_and_merge(...)` path.
+
+::: rorycommon.Common
+    options:
+      members:
+        - init_fdhope_worker_context
+        - encrypt_chunk_fdhope_with_initialized_executor
+        - segment_and_encrypt_fdhope_with_initialized_executor_timed
 
 ### Retrieval
 
