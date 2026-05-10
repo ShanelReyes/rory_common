@@ -36,7 +36,8 @@ L = Log(
 
 from enum import Enum
 class Scheme(Enum):
-    """Encryption scheme used by ``StorageBackend`` to dispatch put/get operations.
+    """`Scheme` selects the encryption/retrieval strategy used by `StorageBackend`.
+
 
     Attributes:
         CKKS: Approximate homomorphic encryption via Pyfhel. Fully abstracted —
@@ -58,7 +59,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class StorageParams:
-    """Tuning knobs for every ``StorageBackend`` get/put call.
+    """Tuning parameters applied to every `put()` / `get()` call on the backend. Pass a custom instance to `StorageBuilder.__init__` or `.with_storage_params()`.
 
     Attributes:
         backoff_factor: Multiplier applied to ``delay`` on each retry.
@@ -88,7 +89,7 @@ class StorageParams:
 
 @dataclass
 class CkksParams:
-    """CKKS key-file locations and encoding configuration.
+    """CKKS key-file locations and encoding configuration. Required for `StorageBackend.put(..., encrypt=True)` on a CKKS backend.
 
     Attributes:
         keys_path: Directory that holds CKKS key files — required for ``put`` with
@@ -113,7 +114,7 @@ class CkksParams:
 
 @dataclass
 class LiuParams:
-    """Liu-scheme construction parameters.
+    """Liu-scheme construction parameters. Required for `StorageBackend.put(..., encrypt=True)` on a LIU backend.
 
     Holds everything needed to build a ``DataOwner`` inside each worker process,
     avoiding pickling of the ``DataOwner`` object on every task submission.
@@ -137,7 +138,7 @@ class LiuParams:
 
 @dataclass
 class FdhopeParams:
-    """FDHoPE scheme construction parameters.
+    """FDHOPE scheme construction parameters. Required for `StorageBackend.put(..., encrypt=True)` on an FDHOPE backend.
 
     Holds everything needed to build a ``DataOwner`` inside each worker process,
     avoiding pickling of the ``DataOwner`` object on every task submission.
