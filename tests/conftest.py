@@ -3,12 +3,12 @@ import os
 import pytest
 import numpy as np
 from mictlanx import AsyncClient
-from rorycommon import Common as RoryCommon
+from rorycommon import Common as RoryCommon, CkksParams, LiuParams, FdhopeParams
 from concurrent.futures import ProcessPoolExecutor
 from rory.core.security.dataowner import DataOwner
 from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
 from rory.core.security.cryptosystem.liu import Liu
-from rory.core.security.cryptosystem.pqc.ckks import Ckks
+from rory.core.security.cryptosystem.pqc.ckks import Ckks,CkksModes
 from uuid import uuid4
 from dotenv import load_dotenv
 
@@ -20,14 +20,15 @@ if os.path.exists(RORY_COMMON_ENV_FILE_PATH):
 
 
 RORY_MAX_WORKERS                  = int(os.environ.get("RORY_MAX_WORKERS","2"))
-RORY_KEYS_PATH                    = os.environ.get("RORY_KEYS_PATH", "/rory/keys")
+RORY_KEYS_PATH                    = os.environ.get("RORY_KEYS_PATH", "/rory/keys/test2")
 RORY_COMMON_CTX_FILENAME          = os.environ.get("RORY_COMMON_CTX_FILENAME","ctx")
 RORY_COMMON_PUBKEY_FILENAME       = os.environ.get("RORY_COMMON_PUBKEY_FILENAME","pubkey")
 RORY_COMMON_SECRETKEY_FILENAME    = os.environ.get("RORY_COMMON_SECRETKEY_FILENAME","secretkey")
 RORY_COMMON_RELINKEY_FILENAME       = os.environ.get("RORY_COMMON_RELINKEY_FILENAME","relinkey")
 RORY_COMMON_ROTATEKEY_FILENAME       = os.environ.get("RORY_COMMON_ROTATEKEY_FILENAME","rotatekey")
 RORY_COMMON_SECURITY_LEVEL        = int(os.environ.get("RORY_COMMON_SECURITY_LEVEL",128))
-RORY_ENABLE_ROTATE_KEY_GENERATION = bool(int(os.environ.get("RORY_ENABLE_ROTATE_KEY_GENERATION",0)))
+RORY_ENABLE_ROTATE_KEY_GENERATION = bool(int(os.environ.get("RORY_ENABLE_ROTATE_KEY_GENERATION",1)))
+RORY_ENABLE_REALINEARIZATION_KEY_GENERATION = bool(int(os.environ.get("RORY_ENABLE_REALINEARIZATION_KEY_GENERATION",1)))
 RORY_SOURCE_PATH                  = os.environ.get("RORY_SOURCE_PATH", "/rory/source")
 MICTLANX_CLIENT_ID                = os.environ.get("MICTLANX_CLIENT_ID","{}_mictlanx".format("rory-common"))
 MICTLANX_TIMEOUT                  = int(os.environ.get("MICTLANX_TIMEOUT",3600))
@@ -40,7 +41,7 @@ MICTLANX_URI                      = os.environ.get("MICTLANX_URI",f"mictlanx://m
 MICTLANX_DEBUG                    = bool(int(os.environ.get("MICTLANX_DEBUG",0)))
 RORY_COMMON_RECORDS            = int(os.environ.get("RORY_COMMON_RECORDS","10"))
 RORY_COMMON_ATTRIBUTES         = int(os.environ.get("RORY_COMMON_ATTRIBUTES","10"))
-
+RORY_CKKS_MODE                 = CkksModes(os.environ.get("RORY_CKKS_MODE","lite_ml"))
 
 @pytest.fixture
 def max_workers():
@@ -82,14 +83,17 @@ async def client():
 
 @pytest.fixture
 def ckks():
+    if not os.path.exists(RORY_KEYS_PATH):
+        os.makedirs(RORY_KEYS_PATH,exist_ok=True)
     _ = Ckks.create_client(
         scheme             = "CKKS",
         decimals           = 2,
-        enable_relinearize = True,
-        security_level     = 128,
+        security_level     = RORY_COMMON_SECURITY_LEVEL,
         save               = True,
         output_path        = RORY_KEYS_PATH,
-        enable_rotate      = RORY_ENABLE_ROTATE_KEY_GENERATION
+        enable_rotate      = RORY_ENABLE_ROTATE_KEY_GENERATION,
+        enable_relinearize = RORY_ENABLE_REALINEARIZATION_KEY_GENERATION,
+        mode               = RORY_CKKS_MODE  
     )
 
     ckks = Ckks.from_pyfhel(
@@ -120,6 +124,44 @@ def dataowner():
     )
     return dataowner
 
+@pytest.fixture
+def ckks_params():
+    return CkksParams(
+        keys_path          = RORY_KEYS_PATH,
+        ctx_filename       = RORY_COMMON_CTX_FILENAME,
+        pubkey_filename    = RORY_COMMON_PUBKEY_FILENAME,
+        secretkey_filename = RORY_COMMON_SECRETKEY_FILENAME,
+        relinkey_filename  = RORY_COMMON_RELINKEY_FILENAME,
+        rotatekey_filename = RORY_COMMON_ROTATEKEY_FILENAME,
+        decimals           = 2,
+        _round             = True,
+    )
+
+@pytest.fixture
+def liu_params():
+    return LiuParams(
+        _round         = True,
+        decimals       = 2,
+        secure_random  = False,
+        seed           = 1,
+        use_np_random  = True,
+        security_level = 128,
+    )
+
+
+@pytest.fixture
+def fdhope_params():
+    return FdhopeParams(
+        scheme         = "DBSKMEANS",
+        sens           = 0.2,
+        _round         = True,
+        decimals       = 2,
+        secure_random  = False,
+        seed           = 1,
+        use_np_random  = True,
+        security_level = 128,
+    )
+
 
 
 
@@ -132,11 +174,11 @@ def ball_id():
     return uuid4().hex.replace("-","")[:16]
 @pytest.fixture
 def bucket_id():
-    return f"test_bucket_{uuid4().hex[:4]}"
+    return f"testbucket{uuid4().hex[:4]}"
 
 @pytest.fixture
 def generated_matrix():
-    return np.random.random(size=(100,10))
+    return np.random.random(size=(10,10))
 
 @pytest.fixture
 def executor():

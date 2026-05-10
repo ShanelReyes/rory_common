@@ -114,7 +114,7 @@ async def test_segment_encrypt_with_ckks_put_chunks_with_executor(client:AsyncCl
 
     key            = f"test_key_{uuid4().hex[:4]}"
 
-    result = await RoryCommon.segment_encrypt_with_vector_ckks_and_put_chunks_with_executor(
+    (result,_,_) = await RoryCommon.segment_encrypt_with_vector_ckks_and_put_chunks_with_executor(
         client             = client,
         bucket_id          = MICTLANX_BUCKET_ID,
         executor           = ppe,
