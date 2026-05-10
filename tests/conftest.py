@@ -8,7 +8,7 @@ from concurrent.futures import ProcessPoolExecutor
 from rory.core.security.dataowner import DataOwner
 from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
 from rory.core.security.cryptosystem.liu import Liu
-from rory.core.security.cryptosystem.pqc.ckks import Ckks
+from rory.core.security.cryptosystem.pqc.ckks import Ckks,CkksModes
 from uuid import uuid4
 from dotenv import load_dotenv
 
@@ -27,7 +27,8 @@ RORY_COMMON_SECRETKEY_FILENAME    = os.environ.get("RORY_COMMON_SECRETKEY_FILENA
 RORY_COMMON_RELINKEY_FILENAME       = os.environ.get("RORY_COMMON_RELINKEY_FILENAME","relinkey")
 RORY_COMMON_ROTATEKEY_FILENAME       = os.environ.get("RORY_COMMON_ROTATEKEY_FILENAME","rotatekey")
 RORY_COMMON_SECURITY_LEVEL        = int(os.environ.get("RORY_COMMON_SECURITY_LEVEL",128))
-RORY_ENABLE_ROTATE_KEY_GENERATION = bool(int(os.environ.get("RORY_ENABLE_ROTATE_KEY_GENERATION",0)))
+RORY_ENABLE_ROTATE_KEY_GENERATION = bool(int(os.environ.get("RORY_ENABLE_ROTATE_KEY_GENERATION",1)))
+RORY_ENABLE_REALINEARIZATION_KEY_GENERATION = bool(int(os.environ.get("RORY_ENABLE_REALINEARIZATION_KEY_GENERATION",1)))
 RORY_SOURCE_PATH                  = os.environ.get("RORY_SOURCE_PATH", "/rory/source")
 MICTLANX_CLIENT_ID                = os.environ.get("MICTLANX_CLIENT_ID","{}_mictlanx".format("rory-common"))
 MICTLANX_TIMEOUT                  = int(os.environ.get("MICTLANX_TIMEOUT",3600))
@@ -40,7 +41,7 @@ MICTLANX_URI                      = os.environ.get("MICTLANX_URI",f"mictlanx://m
 MICTLANX_DEBUG                    = bool(int(os.environ.get("MICTLANX_DEBUG",0)))
 RORY_COMMON_RECORDS            = int(os.environ.get("RORY_COMMON_RECORDS","10"))
 RORY_COMMON_ATTRIBUTES         = int(os.environ.get("RORY_COMMON_ATTRIBUTES","10"))
-
+RORY_CKKS_MODE                 = CkksModes(os.environ.get("RORY_CKKS_MODE","lite_ml"))
 
 @pytest.fixture
 def max_workers():
@@ -82,14 +83,17 @@ async def client():
 
 @pytest.fixture
 def ckks():
+    if not os.path.exists(RORY_KEYS_PATH):
+        os.makedirs(RORY_KEYS_PATH,exist_ok=True)
     _ = Ckks.create_client(
         scheme             = "CKKS",
         decimals           = 2,
-        enable_relinearize = True,
-        security_level     = 128,
+        security_level     = RORY_COMMON_SECURITY_LEVEL,
         save               = True,
         output_path        = RORY_KEYS_PATH,
-        enable_rotate      = RORY_ENABLE_ROTATE_KEY_GENERATION
+        enable_rotate      = RORY_ENABLE_ROTATE_KEY_GENERATION,
+        enable_relinearize = RORY_ENABLE_REALINEARIZATION_KEY_GENERATION,
+        mode               = RORY_CKKS_MODE  
     )
 
     ckks = Ckks.from_pyfhel(
