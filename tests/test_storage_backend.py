@@ -473,7 +473,9 @@ async def test_01(client,ckks,ckks_params,storage_ids,small_vector):
         bucket_id = storage_ids["bucket_id"],
         ball_id   = storage_ids["ball_id"],
         data      = small_vector,
-        encrypt   = True
+        encrypt   = True,
+        segment   = True,
+        delete    = True
     )
     assert result.is_ok, result.unwrap_err()
     result = await backend.get(
@@ -482,19 +484,19 @@ async def test_01(client,ckks,ckks_params,storage_ids,small_vector):
         encrypt   = True
     )
     assert result.is_ok, result.unwrap_err()    
-    assert len(result.unwrap().raw_value) == len(small_vector)
+    raw_value = result.unwrap().raw_value 
+    assert len(raw_value) == len(small_vector)
+    print(raw_value)
+    print(type(raw_value))
 
-    # print(len(result.unwrap().raw_value))
-    # print(result)
-    # result = await backend.put(**storage_ids, data=small_vector, encrypt=True)
-    # assert result.is_ok, result.unwrap_err()
-    # result = await backend.get(**storage_ids, encrypt=True)
-    # assert result.is_ok, result.unwrap_err()
-    # value = result.unwrap()
-    # assert value.raw_value is not None
-    # assert isinstance(value.raw_value, list)
-    # assert all(isinstance(x, PyCtxt) for x in value.raw_value)
-
+    result = await backend.put(
+        bucket_id = storage_ids["bucket_id"],
+        ball_id   = storage_ids["ball_id"],
+        data      = raw_value,
+        delete    = True,
+        segment   = True,
+        encrypt   = False
+    )
 
 # ---------------------------------------------------------------------------
 # put with string path — auto-delegates to put_from_file

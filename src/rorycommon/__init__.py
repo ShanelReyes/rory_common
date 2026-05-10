@@ -1097,7 +1097,7 @@ class Common:
                 max_retries        = max_attempts,
                 n                  = plaintext_matrix.shape[0]*plaintext_matrix.shape[1],
                 num_chunks         = num_chunks,
-                keys_path=keys_path,
+                keys_path          = keys_path,
                 pubkey_filename    = pubkey_filename,
                 plaintext_matrix   = plaintext_matrix,
                 relinkey_filename  = relinkey_filename,
@@ -1263,15 +1263,15 @@ class Common:
         """
         try:
             (result, segment_time, encrypt_time, upload_time) = await Common.segement_and_encrypt_ckks_with_initialized_executor_put_chunks(
+                client             = client,
                 ball_id            = ball_id,
                 bucket_id          = bucket_id,
-                client             = client,
                 ctx_filename       = ctx_filename,
                 key                = ball_id,
                 max_retries        = max_attempts,
                 n                  = plaintext_matrix.shape[0]*plaintext_matrix.shape[1],
                 num_chunks         = num_chunks,
-                keys_path               = keys_path,
+                keys_path          = keys_path,
                 pubkey_filename    = pubkey_filename,
                 plaintext_matrix   = plaintext_matrix,
                 relinkey_filename  = relinkey_filename,
@@ -1398,8 +1398,15 @@ class Common:
         try:
             global ckks 
             global dataowner
-            print("Path in init_ckks_worker_context:", path)
-            # print(ctx_filename, pubkey_filename, secretkey_filename, relinkey_filename, rotatekey_filename)
+            L.debug({
+                "message": "Initializing CKKS context in worker process",
+                "path": path,
+                "ctx_filename": ctx_filename,
+                "pubkey_filename": pubkey_filename,
+                "secretkey_filename": secretkey_filename,
+                "relinkey_filename": relinkey_filename,
+                "rotatekey_filename": rotatekey_filename,
+            })
             ckks= Ckks.from_pyfhel(
                 _round             = _round,
                 decimals           = decimals,
@@ -2203,26 +2210,41 @@ class Common:
 
 
     @staticmethod
-    def encrypt_vector_ckks_with_executor(executor:ProcessPoolExecutor, key:str, vector:npt.NDArray, _round:bool, decimals:int, path:str, ctx_filename:str, pubkey_filename:str, secretkey_filename:str, relinkey_filename:str="", rotatekey_filename:str=""):
-        return Common.segment_and_encrypt_ckks_with_executor(
-            executor           = executor,
+    def encrypt_vector_ckks_with_initialized_executor(
+        # executor:ProcessPoolExecutor,
+        key:str,
+        vector:npt.NDArray,
+        path: str,
+        ctx_filename:str="ctx",
+        pubkey_filename:str="pubkey",
+        secretkey_filename:str="secretkey",
+        relinkey_filename:str="",
+        rotatekey_filename:str="",
+        decimals:int=2,
+        _round:bool = False,
+        max_workers:int = int(os.cpu_count()/2)
+    ):
+        return Common.segment_and_encrypt_ckks_with_initialized_executor(
+            # executor           = executor,
             key                = key,
             plaintext_matrix   = vector,
             n                  = vector.size,
-            _round             = _round,
-            decimals           = decimals,
-            path               = path,
+            num_chunks         = 1,
             ctx_filename       = ctx_filename,
             pubkey_filename    = pubkey_filename,
             secretkey_filename = secretkey_filename,
-            num_chunks         = 1,
             relinkey_filename  = relinkey_filename,
-            rotatekey_filename = rotatekey_filename
+            rotatekey_filename = rotatekey_filename,
+            decimals           = decimals,
+            path               = path,
+            _round             = _round,
+            max_workers         = max_workers
         )
     
     
     @staticmethod
     def segment_and_encrypt_ckks_with_initialized_executor(
+        # executor:ProcessPoolExecutor,
         key:str, 
         plaintext_matrix:npt.NDArray,
         n:int, 
@@ -2234,12 +2256,13 @@ class Common:
         secretkey_filename:str,
         num_chunks:int=2,
         relinkey_filename:str="",
-        rotatekey_filename:str=""
+        rotatekey_filename:str="",
+        max_workers:int = int(os.cpu_count()/2)
     ):
         """Segment a matrix and CKKS-encrypt each chunk using an internal process pool with pre-initialized context."""
         t0 = T.monotonic()
         executor = ProcessPoolExecutor(
-            max_workers = num_chunks,
+            max_workers = max_workers if num_chunks > max_workers else num_chunks,
             initializer = Common.init_ckks_worker_context,
             initargs    = (path, ctx_filename, pubkey_filename, secretkey_filename, relinkey_filename, rotatekey_filename, _round, decimals)
         )   
@@ -2269,44 +2292,47 @@ class Common:
         ball_id:str,
         key:str, 
         plaintext_matrix:npt.NDArray,
-        keys_path:str,
-        ctx_filename:str,
-        pubkey_filename:str,
-        secretkey_filename:str,
         n:int, 
-        _round:bool= False,
+        keys_path:str,
         num_chunks:int = 2, 
-        decimals:int = 2,
-        relinkey_filename:str="",
-        rotatekey_filename:str="",
         timeout:int = 120,
         max_retries:int = 5,
-        tags:Dict[str,str] = {}
+        tags:Dict[str,str] = {},
+        ctx_filename:str = "ctx",
+        pubkey_filename:str = "pubkey",
+        secretkey_filename:str = "secretkey",
+        relinkey_filename:str = "",
+        rotatekey_filename:str = "",
+        decimals:int = 2,
+        _round:bool = False,
+        max_workers:int = int(os.cpu_count()/2)
+
     ):
         
         (encrypted_chunks,segment_time,encrypt_time) = Common.segment_and_encrypt_ckks_with_initialized_executor(
             key                = key,
             plaintext_matrix   = plaintext_matrix,
             n                  = n,
-            _round             = _round,
-            decimals           = decimals,
+            num_chunks         = num_chunks,
             path               = keys_path,
             ctx_filename       = ctx_filename,
-            pubkey_filename    = pubkey_filename, 
-            num_chunks         = num_chunks,
+            pubkey_filename    = pubkey_filename,
+            secretkey_filename = secretkey_filename,
             relinkey_filename  = relinkey_filename,
             rotatekey_filename = rotatekey_filename,
-            secretkey_filename = secretkey_filename
+            decimals           = decimals,
+            _round             = _round,
+            max_workers         = max_workers
         )
         t1 = T.monotonic()
         put_result = await Common.put_chunks(
-            client    = client,
-            bucket_id = bucket_id,
-            key       = ball_id,
-            chunks    = encrypted_chunks,
-            max_retries=max_retries, 
-            timeout=timeout,
-            tags      = tags,
+            client      = client,
+            bucket_id   = bucket_id,
+            key         = ball_id,
+            chunks      = encrypted_chunks,
+            max_retries = max_retries,
+            timeout     = timeout,
+            tags        = tags,
         )
         upload_time = T.monotonic() - t1
         return (put_result,segment_time, encrypt_time, upload_time)
@@ -2320,31 +2346,15 @@ class Common:
         key:str,
         plaintext_matrix:npt.NDArray,
         n:int,
-        _round:bool,
-        decimals:int,
-        path:str,
-        ctx_filename:str,
-        pubkey_filename:str,
-        secretkey_filename:str,
         num_chunks:int=2,
-        relinkey_filename:str="",
-        rotatekey_filename:str=""
     ):
         plaintext_matrix_chunks = Chunks.from_ndarray( ndarray = plaintext_matrix, group_id = key, num_chunks = num_chunks).unwrap()
         awaitable_chunks:List[Awaitable[Chunk]] = []
         for plaintext_matrix_chunk in plaintext_matrix_chunks.iter():
             future = executor.submit(
-                Common.encrypt_chunk_ckks,
+                Common.encrypt_chunk_ckks_with_initialized_executor,
                 key                = key,
                 chunk              = plaintext_matrix_chunk,
-                _round             = _round,
-                decimals           = decimals,
-                path               = path,
-                ctx_filename       = ctx_filename,
-                pubkey_filename    = pubkey_filename,
-                secretkey_filename = secretkey_filename,
-                relinkey_filename  = relinkey_filename,
-                rotatekey_filename =  rotatekey_filename,
             )
             awaitable_chunks.append(future)
         return Chunks(chs= Common.to_chunks_generator(awaitable_chunks=awaitable_chunks),n =n)
@@ -2801,107 +2811,107 @@ class Common:
         return put_chunks_generator_results,seg_encrypt_rt,T.time()-t1
     
 
-    @staticmethod
-    async def segment_encrypt_with_vector_ckks_and_put_chunks_with_executor(
-        client: AsyncClient,
-        bucket_id:str,
-        executor:ProcessPoolExecutor, 
-        key:str, 
-        vector:npt.NDArray, 
-        _round:bool,
-        decimals:int,
-        path:str,
-        ctx_filename:str,
-        pubkey_filename:str,
-        secretkey_filename:str,
-        relinkey_filename:str="",
-        rotatekey_filename:str="",
-        tags:Dict[str,str]={},
-        timeout:int =300,
-        max_attempts:int =5
-    ) :
-        t1     = T.monotonic()
+    # @staticmethod
+    # async def segment_encrypt_with_vector_ckks_and_put_chunks_with_executor(
+    #     client: AsyncClient,
+    #     bucket_id:str,
+    #     executor:ProcessPoolExecutor, 
+    #     key:str, 
+    #     vector:npt.NDArray, 
+    #     _round:bool,
+    #     decimals:int,
+    #     path:str,
+    #     ctx_filename:str,
+    #     pubkey_filename:str,
+    #     secretkey_filename:str,
+    #     relinkey_filename:str="",
+    #     rotatekey_filename:str="",
+    #     tags:Dict[str,str]={},
+    #     timeout:int =300,
+    #     max_attempts:int =5
+    # ) :
+    #     t1     = T.monotonic()
         
-        chunks = Common.encrypt_vector_ckks_with_executor(
-            executor           = executor,
-            key                = key,
-            vector             = vector,
-            _round             = _round,
-            decimals           = decimals,
-            path               = path,
-            ctx_filename       = ctx_filename,
-            pubkey_filename    = pubkey_filename,
-            secretkey_filename = secretkey_filename,
-            relinkey_filename  = relinkey_filename,
-            rotatekey_filename = rotatekey_filename 
-        )
-        encrypt_time = T.monotonic() - t1
-        t1 = T.monotonic()
-        put_result = await Common.delete_and_put_chunks(
-            client    = client,
-            bucket_id = bucket_id,
-            key       = key,
-            chunks    = chunks,
-            timeout   = timeout,
-            max_tries = max_attempts,
-            tags      = tags
+    #     chunks = Common.encrypt_vector_ckks_with_initialized_executor(
+    #         executor           = executor,
+    #         key                = key,
+    #         vector             = vector,
+    #         _round             = _round,
+    #         decimals           = decimals,
+    #         path               = path,
+    #         ctx_filename       = ctx_filename,
+    #         pubkey_filename    = pubkey_filename,
+    #         secretkey_filename = secretkey_filename,
+    #         relinkey_filename  = relinkey_filename,
+    #         rotatekey_filename = rotatekey_filename 
+    #     )
+    #     encrypt_time = T.monotonic() - t1
+    #     t1 = T.monotonic()
+    #     put_result = await Common.delete_and_put_chunks(
+    #         client    = client,
+    #         bucket_id = bucket_id,
+    #         key       = key,
+    #         chunks    = chunks,
+    #         timeout   = timeout,
+    #         max_tries = max_attempts,
+    #         tags      = tags
             
-        )
-        upload_time = T.monotonic() - t1
-        return (put_result, encrypt_time, upload_time)
+    #     )
+    #     upload_time = T.monotonic() - t1
+    #     return (put_result, encrypt_time, upload_time)
     
-    @staticmethod
-    async def segment_encrypt_vector_ckks_put_chunks_with_executor(
-        client: AsyncClient,
-        bucket_id: str,
-        executor: ProcessPoolExecutor,
-        key: str,
-        vector: npt.NDArray,
-        _round: bool,
-        decimals: int,
-        path: str,
-        ctx_filename: str,
-        pubkey_filename: str,
-        secretkey_filename: str,
-        relinkey_filename: str = "",
-        rotatekey_filename: str = "",
-        tags: Dict[str, str] = {},
-        timeout: int = 300,
-        max_attempts: int = 5,
-    ):
-        """Encrypt a 1-D vector with a caller-supplied executor and upload with ``put_chunks``.
+    # @staticmethod
+    # async def segment_encrypt_vector_ckks_put_chunks_with_executor(
+    #     client: AsyncClient,
+    #     bucket_id: str,
+    #     executor: ProcessPoolExecutor,
+    #     key: str,
+    #     vector: npt.NDArray,
+    #     _round: bool,
+    #     decimals: int,
+    #     path: str,
+    #     ctx_filename: str,
+    #     pubkey_filename: str,
+    #     secretkey_filename: str,
+    #     relinkey_filename: str = "",
+    #     rotatekey_filename: str = "",
+    #     tags: Dict[str, str] = {},
+    #     timeout: int = 300,
+    #     max_attempts: int = 5,
+    # ):
+    #     """Encrypt a 1-D vector with a caller-supplied executor and upload with ``put_chunks``.
 
-        Unlike ``segment_encrypt_with_vector_ckks_and_put_chunks_with_executor``, this
-        method does **not** delete any existing object before uploading.  Pre-deletion is
-        the caller's responsibility (e.g. via the ``delete`` flag on ``StorageBackend.put``).
-        """
-        t1 = T.monotonic()
-        chunks = Common.encrypt_vector_ckks_with_executor(
-            executor           = executor,
-            key                = key,
-            vector             = vector,
-            _round             = _round,
-            decimals           = decimals,
-            path               = path,
-            ctx_filename       = ctx_filename,
-            pubkey_filename    = pubkey_filename,
-            secretkey_filename = secretkey_filename,
-            relinkey_filename  = relinkey_filename,
-            rotatekey_filename = rotatekey_filename,
-        )
-        encrypt_time = T.monotonic() - t1
-        t1 = T.monotonic()
-        put_result = await Common.put_chunks(
-            client      = client,
-            bucket_id   = bucket_id,
-            key         = key,
-            chunks      = chunks,
-            timeout     = timeout,
-            max_retries = max_attempts,
-            tags        = tags,
-        )
-        upload_time = T.monotonic() - t1
-        return (put_result, encrypt_time, upload_time)
+    #     Unlike ``segment_encrypt_with_vector_ckks_and_put_chunks_with_executor``, this
+    #     method does **not** delete any existing object before uploading.  Pre-deletion is
+    #     the caller's responsibility (e.g. via the ``delete`` flag on ``StorageBackend.put``).
+    #     """
+    #     t1 = T.monotonic()
+    #     chunks = Common.encrypt_vector_ckks_with_initialized_executor(
+    #         executor           = executor,
+    #         key                = key,
+    #         vector             = vector,
+    #         _round             = _round,
+    #         decimals           = decimals,
+    #         path               = path,
+    #         ctx_filename       = ctx_filename,
+    #         pubkey_filename    = pubkey_filename,
+    #         secretkey_filename = secretkey_filename,
+    #         relinkey_filename  = relinkey_filename,
+    #         rotatekey_filename = rotatekey_filename,
+    #     )
+    #     encrypt_time = T.monotonic() - t1
+    #     t1 = T.monotonic()
+    #     put_result = await Common.put_chunks(
+    #         client      = client,
+    #         bucket_id   = bucket_id,
+    #         key         = key,
+    #         chunks      = chunks,
+    #         timeout     = timeout,
+    #         max_retries = max_attempts,
+    #         tags        = tags,
+    #     )
+    #     upload_time = T.monotonic() - t1
+    #     return (put_result, encrypt_time, upload_time)
 
     @staticmethod
     async def segment_encrypt_with_vector_ckks_and_put_chunks_with_initialized_executor(
@@ -2923,15 +2933,9 @@ class Common:
         max_attempts:int =5
     ):
         try:
-            executor = ProcessPoolExecutor(
-                max_workers = max_workers,
-                initializer = Common.init_ckks_worker_context,
-                initargs    = (path, ctx_filename, pubkey_filename, secretkey_filename, relinkey_filename, rotatekey_filename, _round, decimals)
-            )
-            res = await Common.segment_encrypt_vector_ckks_put_chunks_with_executor(
-                client             = client,
-                bucket_id          = bucket_id,
-                executor           = executor,
+            t1 = T.monotonic()
+            chunks = Common.encrypt_vector_ckks_with_initialized_executor(
+                # executor           = executor,
                 key                = key,
                 vector             = vector,
                 _round             = _round,
@@ -2942,11 +2946,48 @@ class Common:
                 secretkey_filename = secretkey_filename,
                 relinkey_filename  = relinkey_filename,
                 rotatekey_filename = rotatekey_filename,
-                tags               = tags,
-                timeout            = timeout,
-                max_attempts       = max_attempts,
+                max_workers         = max_workers
+                # max_workers
             )
-            return res
+            encrypt_time = T.monotonic() - t1
+            t1 = T.monotonic()
+            put_result = await Common.put_chunks(
+                client      = client,
+                bucket_id   = bucket_id,
+                key         = key,
+                chunks      = chunks,
+                timeout     = timeout,
+                max_retries = max_attempts,
+                tags        = tags,
+            )
+            upload_time = T.monotonic() - t1
+            return (put_result, encrypt_time, upload_time)
+            # executor = ProcessPoolExecutor(
+            #     max_workers = max_workers,
+            #     initializer = Common.init_ckks_worker_context,
+            #     initargs    = (path, ctx_filename, pubkey_filename, secretkey_filename, relinkey_filename, rotatekey_filename, _round, decimals)
+            # )
+            
+            
+            # res = await Common.segment_encrypt_vector_ckks_put_chunks_with_executor(
+            #     client             = client,
+            #     bucket_id          = bucket_id,
+            #     # executor           = executor,
+            #     key                = key,
+            #     vector             = vector,
+            #     _round             = _round,
+            #     decimals           = decimals,
+            #     path               = path,
+            #     ctx_filename       = ctx_filename,
+            #     pubkey_filename    = pubkey_filename,
+            #     secretkey_filename = secretkey_filename,
+            #     relinkey_filename  = relinkey_filename,
+            #     rotatekey_filename = rotatekey_filename,
+            #     tags               = tags,
+            #     timeout            = timeout,
+            #     max_attempts       = max_attempts,
+            # )
+            # return res
         except Exception as e:
             raise e
 

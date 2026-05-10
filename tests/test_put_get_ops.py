@@ -7,94 +7,9 @@ from mictlanx.utils.segmentation import Chunks
 from concurrent.futures import ProcessPoolExecutor
 from rory.core.security.dataowner import DataOwner
 import numpy.typing as npt
-# from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
-# from rory.core.security.cryptosystem.liu import Liu
 from rory.core.utils.constants import Constants
-# from rory.core.security.cryptosystem.pqc.ckks import Ckks
 from rory.core.clustering.secure.pqc.skmeans import Skmeans as SkmeansPQC
 from uuid import uuid4
-# from dotenv import load_dotenv
-
-# RORY_COMMON_ENV_FILE_PATH = os.environ.get("RORY_COMMON_ENV_FILE_PATH","./.env.test")
-# if os.path.exists(RORY_COMMON_ENV_FILE_PATH):
-#     load_dotenv(dotenv_path=RORY_COMMON_ENV_FILE_PATH)
-
-
-# MICTLANX_CLIENT_ID             = os.environ.get("MICTLANX_CLIENT_ID","{}_mictlanx".format("rory-common"))
-# MICTLANX_TIMEOUT               = int(os.environ.get("MICTLANX_TIMEOUT",3600))
-# MICTLANX_API_VERSION           = int(os.environ.get("MICTLANX_API_VERSION","4"))
-# MICTLANX_MAX_WORKERS           = int(os.environ.get("MICTLANX_MAX_WORKERS","12"))
-# MICTLANX_BUCKET_ID             = os.environ.get("MICTLANX_BUCKET_ID","rory")
-# MICTLANX_OUTPUT_PATH           = os.environ.get("MICTLANX_OUTPUT_PATH","/rory/mictlanx")
-# MICTLANX_PROTOCOL              = os.environ.get("MICTLANX_PROTOCOL","http")
-# MICTLANX_URI                   = os.environ.get("MICTLANX_URI",f"mictlanx://mictlanx-router-0@localhost:63666?api_version={MICTLANX_API_VERSION}&protocol={MICTLANX_PROTOCOL}")
-# MICTLANX_DEBUG                 = bool(int(os.environ.get("MICTLANX_DEBUG",0)))
-# RORY_KEYS_PATH                 = os.environ.get("RORY_KEYS_PATH","/rory/keys")
-# RORY_COMMON_CTX_FILENAME       = os.environ.get("RORY_COMMON_CTX_FILENAME","ctx")
-# RORY_COMMON_PUBKEY_FILENAME    = os.environ.get("RORY_COMMON_PUBKEY_FILENAME","pubkey")
-# RORY_COMMON_SECRETKEY_FILENAME = os.environ.get("RORY_COMMON_SECRETKEY_FILENAME","secretkey")
-# RORY_COMMON_SECURITY_LEVEL     = int(os.environ.get("RORY_COMMON_SECURITY_LEVEL",128))
-# RORY_COMMON_RECORDS            = int(os.environ.get("RORY_COMMON_RECORDS","10"))
-# RORY_COMMON_ATTRIBUTES         = int(os.environ.get("RORY_COMMON_ATTRIBUTES","10"))
-
-
-# RORY_MAX_WORKERS                  = int(os.environ.get("RORY_MAX_WORKERS","2"))
-# RORY_ENABLE_ROTATE_KEY_GENERATION = bool(int(os.environ.get("RORY_ENABLE_ROTATE_KEY_GENERATION",0)))
-# RORY_SOURCE_PATH                  = os.environ.get("RORY_SOURCE_PATH", "/rory/source")
-
-
-# dataowner_pqc = DataOwnerPQC(
-#     scheme=ckks,
-#     securitylevel=128
-
-# )
-
-
-# @pytest.fixture(scope="module")
-# def ckks():
-#     _ = Ckks.create_client(
-#         scheme             = "CKKS",
-#         decimals           = 2,
-#         enable_relinearize = True,
-#         security_level     = 128,
-#         save               = True,
-#         output_path        = RORY_KEYS_PATH
-#     )
-#     ckks = Ckks.from_pyfhel(
-#         path=RORY_KEYS_PATH,
-#     )
-#     return ckks
-
-# @pytest.fixture(scope="module") 
-# def dataowner_pqc(ckks):
-#     dataowner_pqc = DataOwnerPQC(
-#         scheme=ckks,
-#         securitylevel=RORY_COMMON_SECURITY_LEVEL
-#     )
-#     return dataowner_pqc
-
-# @pytest.fixture(scope="module")
-# def dataowner():
-#     dataowner = DataOwner(
-#         liu_scheme    = Liu(),
-#         seed          = None,
-#         securitylevel = RORY_COMMON_SECURITY_LEVEL,
-#     )
-#     return dataowner
-
-# @pytest.fixture(scope="module")
-# def client():
-#     client = AsyncClient(
-#         uri              = MICTLANX_URI,
-#         client_id        = MICTLANX_CLIENT_ID,
-#         capacity_storage = "200mb",
-#         debug            = MICTLANX_DEBUG,
-#         eviction_policy  = "LRU",
-#         max_workers      = MICTLANX_MAX_WORKERS,
-#         verify           = False
-#     )
-#     return client
-
 
 
 @pytest.mark.asyncio
@@ -223,7 +138,7 @@ async def test_ckks_segment_encrypt_delete_put_get_chunks(key,ckks, client,gener
     RORY_KEYS_PATH                 = get_context["keys_path"]
     MICTLANX_BUCKET_ID             = get_context["bucket_id"]
 
-    emt = RoryCommon.segment_and_encrypt_ckks_with_executor(
+    emt = RoryCommon.segment_and_encrypt_ckks_with_initialized_executor(
         executor           = ProcessPoolExecutor(max_workers=num_chunks),
         key                = key,
         plaintext_matrix   = generated_matrix,
@@ -286,7 +201,7 @@ async def test_full_skmeans_pqc(executor,dataowner_pqc, client,generated_matrix,
     udm_id              = f"udmid{uuid4().hex.replace('-','')}"
     encrypted_shift_matrix_id = f"encryptedshiftmatrixid{uuid4().hex.replace('-','')}"
 
-    encrypted_matrix_chunks = RoryCommon.segment_and_encrypt_ckks_with_executor( #Encrypt 
+    encrypted_matrix_chunks = RoryCommon.segment_and_encrypt_ckks_with_initialized_executor( #Encrypt 
         executor           = executor,
         key                = encrypted_matrix_id,
         plaintext_matrix   = plaintext_matrix,
@@ -314,7 +229,7 @@ async def test_full_skmeans_pqc(executor,dataowner_pqc, client,generated_matrix,
     # ===================================================
     zero_shiftmatrix = np.zeros((k, a))
     n2 = a*k
-    encrypted_zero_shiftmatrix_chunks = RoryCommon.segment_and_encrypt_ckks_with_executor( #Encrypt 
+    encrypted_zero_shiftmatrix_chunks = RoryCommon.segment_and_encrypt_ckks_with_initialized_executor( #Encrypt 
         executor           = executor,
         key                = init_sm_id,
         plaintext_matrix   = zero_shiftmatrix,
