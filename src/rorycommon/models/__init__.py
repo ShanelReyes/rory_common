@@ -5,8 +5,6 @@ import numpy.typing as npt
 @dataclass
 class PutPlaintextResult:
     """Model for the result of a plaintext put operation, including metadata and timing information."""
-    path: Optional[str] = field(default=None)
-    """Optional path where the plaintext was stored. This may be None if the storage backend does not provide a path."""
     extension: str
     """File extension indicating the format of the stored plaintext (e.g., '.txt', '.csv')."""
     bucket_id: str
@@ -25,6 +23,8 @@ class PutPlaintextResult:
     """Time taken to segment the plaintext data into appropriate chunks for storage, in seconds."""
     upload_time: float
     """Time taken to upload the plaintext data to the storage backend, in seconds."""
+    path: Optional[str] = field(default=None)
+    """Optional path where the plaintext was stored. This may be None if the storage backend does not provide a path."""
     def __str__(self):
         return (f"PutPlaintextResult(path={self.path}, extension={self.extension}, bucket_id={self.bucket_id}, "
                 f"ball_id={self.ball_id}, tags={self.tags}, shape={self.shape}, dtype={self.dtype}, "
