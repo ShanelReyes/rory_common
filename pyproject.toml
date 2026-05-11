@@ -1,6 +1,6 @@
 [project]
 name = "rorycommon"
-version = "1.0.0-alpha.0"
+version = "1.0.0-alpha.1"
 description = ""
 authors = [
     {name = "Ignacio Castillo",email = "ignacio.bcastillo@gmail.com"},
@@ -14,7 +14,7 @@ python = ">=3.11,<4.0"
 pandas = ">=2.2.3,<3.0.0"
 numpy = ">=2.2.4"
 pytest = ">=8.4.1,<9.0.0"
-mictlanx = "0.1.0a5"
+mictlanx = {version = "0.1.0a6", source = "testpypi"}
 phe = "^1.5.0"
 pyfhel = "3.5.0"
 python-dotenv = "^1.2.2"
