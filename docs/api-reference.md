@@ -311,6 +311,8 @@ In practice, when you call `StorageBackend.get()` today, you should expect
         - from_matrix_on_disk_to_cloud_storage_ckks
         - from_vector_to_cloud_storage_ckks
         - from_vector_on_disk_to_cloud_storage_ckks
+        - segment_and_encrypt_ckks_with_initialized_executor
+        - encrypt_vector_ckks_with_initialized_executor
 
 ### Liu
 
