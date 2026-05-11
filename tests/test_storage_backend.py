@@ -469,32 +469,56 @@ async def test_put_from_file_delete_flag(client, ckks, ckks_params, storage_ids,
 @pytest.mark.asyncio
 async def test_01(client,ckks,ckks_params,storage_ids,small_vector):
     backend = ckks_builder(client, ckks, ckks_params)
+    # Delete + Segment + Encrypt + Put
     result = await backend.put(
         bucket_id = storage_ids["bucket_id"],
         ball_id   = storage_ids["ball_id"],
         data      = small_vector,
-        encrypt   = True
+        encrypt   = True,
+        segment   = True,
+        delete    = True
     )
     assert result.is_ok, result.unwrap_err()
+    # Get the encrypted data
     result = await backend.get(
         bucket_id = storage_ids["bucket_id"],
         ball_id   = storage_ids["ball_id"],
         encrypt   = True
     )
     assert result.is_ok, result.unwrap_err()    
-    assert len(result.unwrap().raw_value) == len(small_vector)
-
-    # print(len(result.unwrap().raw_value))
-    # print(result)
-    # result = await backend.put(**storage_ids, data=small_vector, encrypt=True)
-    # assert result.is_ok, result.unwrap_err()
-    # result = await backend.get(**storage_ids, encrypt=True)
-    # assert result.is_ok, result.unwrap_err()
-    # value = result.unwrap()
-    # assert value.raw_value is not None
-    # assert isinstance(value.raw_value, list)
-    # assert all(isinstance(x, PyCtxt) for x in value.raw_value)
-
+    x = result.unwrap()
+    raw_value = x.raw_value 
+    assert len(raw_value) == len(small_vector)
+    # from rorycommon import Common
+    import time as T
+    dx = ckks.decrypt_list(raw_value,take=1)
+  
+    # Delete + Segment + Put
+    result = await backend.put(
+        bucket_id = storage_ids["bucket_id"],
+        ball_id   = storage_ids["ball_id"],
+        data      = raw_value,
+        delete    = True,
+        segment   = True,
+        encrypt   = False
+    )
+    assert result.is_ok, result.unwrap_err()
+    # Get the encrypted, segmented data
+    result = await backend.get(
+        bucket_id = storage_ids["bucket_id"],
+        ball_id   = storage_ids["ball_id"],
+        encrypt   = True,
+        segment   = True
+    )
+    assert result.is_ok, result.unwrap_err()
+    raw_value2 = result.unwrap().raw_value
+    dx1 = ckks.decrypt_list(raw_value2,take=1)
+    assert len(raw_value2) == len(small_vector) 
+    assert all(isinstance(x, PyCtxt) for x in raw_value2)
+    assert len(raw_value) == len(raw_value2)
+    assert all(abs(x[0] - x[0]) < 1e-5 for x in zip(dx, dx1))
+    # print(dx)
+    # print(dx1)
 
 # ---------------------------------------------------------------------------
 # put with string path — auto-delegates to put_from_file

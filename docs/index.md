@@ -104,31 +104,6 @@ result = await backend.get(bucket_id="rory", ball_id="model_v1_enc", encrypt=Tru
 ciphertexts = result.unwrap().raw_value   # List[PyCtxt]
 ```
 
-### FDHOPE put/get
-
-FDHOPE uses the same backend interface, but the caller is responsible for generating
-the UDM first. `StorageBackend.put(..., encrypt=True)` only handles segmentation,
-FDHOPE encryption, and upload of that precomputed ndarray.
-
-```python
-fdhope_backend = (
-    StorageBuilder(storage_client=client, scheme=Scheme.FDHOPE)
-    .with_fdhope_params(FdhopeParams(scheme="DBSKMEANS", sens=0.2))
-    .build()
-)
-
-dataowner = DataOwner(...)
-udm = dataowner.get_U(
-    algorithm="DBSKMEANS",
-    plaintext_matrix=matrix,
-)
-
-result = await fdhope_backend.put(bucket_id="rory", ball_id="model_fdhope", data=udm, encrypt=True)
-
-# FDHOPE reads return the merged stored chunks as an ndarray.
-result = await fdhope_backend.get(bucket_id="rory", ball_id="model_fdhope", encrypt=True)
-encrypted_udm = result.unwrap().raw_value   # np.ndarray
-```
 
 ## Error handling
 

@@ -65,14 +65,14 @@ def client():
 async def test_encrypt_vector(client:AsyncClient,ckks: Ckks):
     # Plain bias
     # bias = np.array([0.],dtype=np.float32)
-    bias = np.zeros(shape=(1,2),dtype=np.float32)
+    bias = np.zeros(shape=10,dtype=np.float32)
 
-    ppe = ProcessPoolExecutor(max_workers=1)
+    # ppe = ProcessPoolExecutor(max_workers=1)
 
     key            = f"test_key_{uuid4().hex[:4]}"
 
-    encrypted_bias = RoryCommon.encrypt_vector_ckks_with_executor(
-        executor           = ppe,
+    (encrypted_bias,_,_) = RoryCommon.encrypt_vector_ckks_with_initialized_executor(
+        # executor           = ppe,
         key                = key,
         vector             = bias,
         _round             = True,
@@ -100,38 +100,61 @@ async def test_encrypt_vector(client:AsyncClient,ckks: Ckks):
         timeout   = MICTLANX_TIMEOUT,
         ckks      = ckks
     )
-    assert len(get_result) >=0
-    print(get_result)
-
-    ppe.shutdown()
-
-@pytest.mark.asyncio
-async def test_segment_encrypt_with_ckks_put_chunks_with_executor(client:AsyncClient,ckks: Ckks):
-    # Plain bias
-    bias = np.zeros(shape=(1,2),dtype=np.float32)
-
-    ppe = ProcessPoolExecutor(max_workers=1)
-
-    key            = f"test_key_{uuid4().hex[:4]}"
-
-    (result,_,_) = await RoryCommon.segment_encrypt_with_vector_ckks_and_put_chunks_with_executor(
-        client             = client,
-        bucket_id          = MICTLANX_BUCKET_ID,
-        executor           = ppe,
-        key                = key,
-        vector             = bias,
-        _round             = True,
-        ctx_filename       = RORY_COMMON_CTX_FILENAME,
-        pubkey_filename    = RORY_COMMON_PUBKEY_FILENAME,
-        secretkey_filename = RORY_COMMON_SECRETKEY_FILENAME,
-        decimals           = 2,
-        path               = RORY_KEYS_PATH,
-        relinkey_filename  = RORY_COMMON_RELINKEY_FILENAME,
-        rotatekey_filename = RORY_COMMON_ROTATEKEY_FILENAME,
-        tags               = {},
-        max_attempts=5,
-        timeout=MICTLANX_TIMEOUT
-
-        
+    assert len(get_result) == len(bias)
+    num_chunks = 2
+    maybe_chunks = RoryCommon.from_pyctxts_to_chunks(key=key,xs=get_result,num_chunks=num_chunks)
+    assert maybe_chunks.is_some
+    chunks = maybe_chunks.unwrap()
+    result = await RoryCommon.put_chunks(
+        client    = client,
+        bucket_id = MICTLANX_BUCKET_ID,
+        key       = key,
+        chunks    = chunks,
     )
     assert result.is_ok
+
+    get_result2 = await RoryCommon.get_pyctxt(
+        client    = client,
+        bucket_id = MICTLANX_BUCKET_ID,
+        key       = key,
+        timeout   = MICTLANX_TIMEOUT,
+        ckks      = ckks
+    )
+
+    assert len(get_result2) == len(bias) and len(get_result2) == len(get_result)
+    # print(chunks)
+
+
+    # print(get_result)
+
+    # ppe.shutdown()
+
+# @pytest.mark.asyncio
+# async def test_segment_encrypt_with_ckks_put_chunks_with_executor(client:AsyncClient,ckks: Ckks):
+#     # Plain bias
+#     bias = np.zeros(shape=(1,2),dtype=np.float32)
+
+
+#     key            = f"test_key_{uuid4().hex[:4]}"
+
+#     (result,_,_) = await RoryCommon.segment_encrypt_with_vector_ckks_and_put_chunks_with_executor(
+#         client             = client,
+#         bucket_id          = MICTLANX_BUCKET_ID,
+#         # executor           = ppe,
+#         key                = key,
+#         vector             = bias,
+#         _round             = True,
+#         ctx_filename       = RORY_COMMON_CTX_FILENAME,
+#         pubkey_filename    = RORY_COMMON_PUBKEY_FILENAME,
+#         secretkey_filename = RORY_COMMON_SECRETKEY_FILENAME,
+#         decimals           = 2,
+#         path               = RORY_KEYS_PATH,
+#         relinkey_filename  = RORY_COMMON_RELINKEY_FILENAME,
+#         rotatekey_filename = RORY_COMMON_ROTATEKEY_FILENAME,
+#         tags               = {},
+#         max_attempts=5,
+#         timeout=MICTLANX_TIMEOUT
+
+        
+#     )
+#     assert result.is_ok

@@ -1,6 +1,6 @@
 services:
   mictlanx-router-0:
-    image: ${MICTLANX_ROUTER_IMAGE:-nachocode/mictlanx:router-0.1.0a5}
+    image: ${MICTLANX_ROUTER_IMAGE:-nachocode/mictlanx:router-0.1.0a6}
     restart: unless-stopped
     env_file:
       - .env.mictlanx.dev
@@ -59,6 +59,11 @@ services:
     command: ["python", "-m", "mictlanxrm.main"]
     env_file:
       - .env.rm.dev
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
     # environment:
 
 
