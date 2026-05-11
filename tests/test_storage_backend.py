@@ -469,6 +469,7 @@ async def test_put_from_file_delete_flag(client, ckks, ckks_params, storage_ids,
 @pytest.mark.asyncio
 async def test_01(client,ckks,ckks_params,storage_ids,small_vector):
     backend = ckks_builder(client, ckks, ckks_params)
+    # Delete + Segment + Encrypt + Put
     result = await backend.put(
         bucket_id = storage_ids["bucket_id"],
         ball_id   = storage_ids["ball_id"],
@@ -478,17 +479,21 @@ async def test_01(client,ckks,ckks_params,storage_ids,small_vector):
         delete    = True
     )
     assert result.is_ok, result.unwrap_err()
+    # Get the encrypted data
     result = await backend.get(
         bucket_id = storage_ids["bucket_id"],
         ball_id   = storage_ids["ball_id"],
         encrypt   = True
     )
     assert result.is_ok, result.unwrap_err()    
-    raw_value = result.unwrap().raw_value 
+    x = result.unwrap()
+    raw_value = x.raw_value 
     assert len(raw_value) == len(small_vector)
-    print(raw_value)
-    print(type(raw_value))
-
+    # from rorycommon import Common
+    import time as T
+    dx = ckks.decrypt_list(raw_value,take=1)
+  
+    # Delete + Segment + Put
     result = await backend.put(
         bucket_id = storage_ids["bucket_id"],
         ball_id   = storage_ids["ball_id"],
@@ -497,6 +502,23 @@ async def test_01(client,ckks,ckks_params,storage_ids,small_vector):
         segment   = True,
         encrypt   = False
     )
+    assert result.is_ok, result.unwrap_err()
+    # Get the encrypted, segmented data
+    result = await backend.get(
+        bucket_id = storage_ids["bucket_id"],
+        ball_id   = storage_ids["ball_id"],
+        encrypt   = True,
+        segment   = True
+    )
+    assert result.is_ok, result.unwrap_err()
+    raw_value2 = result.unwrap().raw_value
+    dx1 = ckks.decrypt_list(raw_value2,take=1)
+    assert len(raw_value2) == len(small_vector) 
+    assert all(isinstance(x, PyCtxt) for x in raw_value2)
+    assert len(raw_value) == len(raw_value2)
+    assert all(abs(x[0] - x[0]) < 1e-5 for x in zip(dx, dx1))
+    # print(dx)
+    # print(dx1)
 
 # ---------------------------------------------------------------------------
 # put with string path — auto-delegates to put_from_file

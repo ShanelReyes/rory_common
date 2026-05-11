@@ -138,8 +138,8 @@ async def test_ckks_segment_encrypt_delete_put_get_chunks(key,ckks, client,gener
     RORY_KEYS_PATH                 = get_context["keys_path"]
     MICTLANX_BUCKET_ID             = get_context["bucket_id"]
 
-    emt = RoryCommon.segment_and_encrypt_ckks_with_initialized_executor(
-        executor           = ProcessPoolExecutor(max_workers=num_chunks),
+    (emt,_,_) = RoryCommon.segment_and_encrypt_ckks_with_initialized_executor(
+        # executor           = ProcessPoolExecutor(max_workers=num_chunks),
         key                = key,
         plaintext_matrix   = generated_matrix,
         n                  = n,
@@ -201,8 +201,8 @@ async def test_full_skmeans_pqc(executor,dataowner_pqc, client,generated_matrix,
     udm_id              = f"udmid{uuid4().hex.replace('-','')}"
     encrypted_shift_matrix_id = f"encryptedshiftmatrixid{uuid4().hex.replace('-','')}"
 
-    encrypted_matrix_chunks = RoryCommon.segment_and_encrypt_ckks_with_initialized_executor( #Encrypt 
-        executor           = executor,
+    (encrypted_matrix_chunks,_,_) = RoryCommon.segment_and_encrypt_ckks_with_initialized_executor( #Encrypt 
+        # executor           = executor,
         key                = encrypted_matrix_id,
         plaintext_matrix   = plaintext_matrix,
         n                  = n,
@@ -229,8 +229,8 @@ async def test_full_skmeans_pqc(executor,dataowner_pqc, client,generated_matrix,
     # ===================================================
     zero_shiftmatrix = np.zeros((k, a))
     n2 = a*k
-    encrypted_zero_shiftmatrix_chunks = RoryCommon.segment_and_encrypt_ckks_with_initialized_executor( #Encrypt 
-        executor           = executor,
+    (encrypted_zero_shiftmatrix_chunks,_,_) = RoryCommon.segment_and_encrypt_ckks_with_initialized_executor( #Encrypt 
+        # executor           = executor,
         key                = init_sm_id,
         plaintext_matrix   = zero_shiftmatrix,
         n                  = n2,

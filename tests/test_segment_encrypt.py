@@ -243,8 +243,7 @@ async def test_ckks(generated_matrix:npt.NDArray[np.float64],key:str, initialize
     RORY_KEYS_PATH                 = get_context["keys_path"]
     pmt                            = generated_matrix
     n                              = pmt.shape[1]*pmt.shape[1]
-    emt = RoryCommon.segment_and_encrypt_ckks_with_initialized_executor(
-        executor           = initialized_executor,
+    (emt,_,_) = RoryCommon.segment_and_encrypt_ckks_with_initialized_executor(
         key                = key,
         plaintext_matrix   = pmt,
         n                  = n,

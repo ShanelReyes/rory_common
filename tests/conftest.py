@@ -19,29 +19,33 @@ if os.path.exists(RORY_COMMON_ENV_FILE_PATH):
 
 
 
-RORY_MAX_WORKERS                  = int(os.environ.get("RORY_MAX_WORKERS","2"))
-RORY_KEYS_PATH                    = os.environ.get("RORY_KEYS_PATH", "/rory/keys/test2")
-RORY_COMMON_CTX_FILENAME          = os.environ.get("RORY_COMMON_CTX_FILENAME","ctx")
-RORY_COMMON_PUBKEY_FILENAME       = os.environ.get("RORY_COMMON_PUBKEY_FILENAME","pubkey")
-RORY_COMMON_SECRETKEY_FILENAME    = os.environ.get("RORY_COMMON_SECRETKEY_FILENAME","secretkey")
-RORY_COMMON_RELINKEY_FILENAME       = os.environ.get("RORY_COMMON_RELINKEY_FILENAME","relinkey")
-RORY_COMMON_ROTATEKEY_FILENAME       = os.environ.get("RORY_COMMON_ROTATEKEY_FILENAME","rotatekey")
-RORY_COMMON_SECURITY_LEVEL        = int(os.environ.get("RORY_COMMON_SECURITY_LEVEL",128))
-RORY_ENABLE_ROTATE_KEY_GENERATION = bool(int(os.environ.get("RORY_ENABLE_ROTATE_KEY_GENERATION",1)))
+RORY_MAX_WORKERS                            = int(os.environ.get("RORY_MAX_WORKERS","2"))
+RORY_KEYS_PATH                              = os.environ.get("RORY_KEYS_PATH", "/rory/keys/test2")
+RORY_COMMON_CTX_FILENAME                    = os.environ.get("RORY_COMMON_CTX_FILENAME","ctx")
+RORY_COMMON_PUBKEY_FILENAME                 = os.environ.get("RORY_COMMON_PUBKEY_FILENAME","pubkey")
+RORY_COMMON_SECRETKEY_FILENAME              = os.environ.get("RORY_COMMON_SECRETKEY_FILENAME","secretkey")
+RORY_COMMON_RELINKEY_FILENAME               = os.environ.get("RORY_COMMON_RELINKEY_FILENAME","relinkey")
+RORY_COMMON_ROTATEKEY_FILENAME              = os.environ.get("RORY_COMMON_ROTATEKEY_FILENAME","rotatekey")
+RORY_COMMON_SECURITY_LEVEL                  = int(os.environ.get("RORY_COMMON_SECURITY_LEVEL",128))
+RORY_ENABLE_ROTATE_KEY_GENERATION           = bool(int(os.environ.get("RORY_ENABLE_ROTATE_KEY_GENERATION",1)))
 RORY_ENABLE_REALINEARIZATION_KEY_GENERATION = bool(int(os.environ.get("RORY_ENABLE_REALINEARIZATION_KEY_GENERATION",1)))
-RORY_SOURCE_PATH                  = os.environ.get("RORY_SOURCE_PATH", "/rory/source")
-MICTLANX_CLIENT_ID                = os.environ.get("MICTLANX_CLIENT_ID","{}_mictlanx".format("rory-common"))
-MICTLANX_TIMEOUT                  = int(os.environ.get("MICTLANX_TIMEOUT",3600))
-MICTLANX_API_VERSION              = int(os.environ.get("MICTLANX_API_VERSION","4"))
-MICTLANX_MAX_WORKERS              = int(os.environ.get("MICTLANX_MAX_WORKERS","12"))
-MICTLANX_BUCKET_ID                = os.environ.get("MICTLANX_BUCKET_ID","rory")
-MICTLANX_OUTPUT_PATH              = os.environ.get("MICTLANX_OUTPUT_PATH","/rory/mictlanx")
-MICTLANX_PROTOCOL                 = os.environ.get("MICTLANX_PROTOCOL","http")
-MICTLANX_URI                      = os.environ.get("MICTLANX_URI",f"mictlanx://mictlanx-router-0@localhost:63666?api_version={MICTLANX_API_VERSION}&protocol={MICTLANX_PROTOCOL}")
-MICTLANX_DEBUG                    = bool(int(os.environ.get("MICTLANX_DEBUG",0)))
-RORY_COMMON_RECORDS            = int(os.environ.get("RORY_COMMON_RECORDS","10"))
-RORY_COMMON_ATTRIBUTES         = int(os.environ.get("RORY_COMMON_ATTRIBUTES","10"))
-RORY_CKKS_MODE                 = CkksModes(os.environ.get("RORY_CKKS_MODE","lite_ml"))
+RORY_SOURCE_PATH                            = os.environ.get("RORY_SOURCE_PATH", "/rory/source")
+MICTLANX_CLIENT_ID                          = os.environ.get("MICTLANX_CLIENT_ID","{}_mictlanx".format("rory-common"))
+MICTLANX_TIMEOUT                            = int(os.environ.get("MICTLANX_TIMEOUT",3600))
+MICTLANX_API_VERSION                        = int(os.environ.get("MICTLANX_API_VERSION","4"))
+MICTLANX_MAX_WORKERS                        = int(os.environ.get("MICTLANX_MAX_WORKERS","12"))
+MICTLANX_BUCKET_ID                          = os.environ.get("MICTLANX_BUCKET_ID","rory")
+MICTLANX_OUTPUT_PATH                        = os.environ.get("MICTLANX_OUTPUT_PATH","/rory/mictlanx")
+MICTLANX_PROTOCOL                           = os.environ.get("MICTLANX_PROTOCOL","http")
+MICTLANX_URI                                = os.environ.get("MICTLANX_URI",f"mictlanx://mictlanx-router-0@localhost:63666?api_version={MICTLANX_API_VERSION}&protocol={MICTLANX_PROTOCOL}")
+MICTLANX_DEBUG                              = bool(int(os.environ.get("MICTLANX_DEBUG",0)))
+RORY_COMMON_RECORDS                         = int(os.environ.get("RORY_COMMON_RECORDS","10"))
+RORY_COMMON_ATTRIBUTES                      = int(os.environ.get("RORY_COMMON_ATTRIBUTES","10"))
+RORY_CKKS_MODE                              = CkksModes(os.environ.get("RORY_CKKS_MODE","lite_ml"))
+RORY_COMMON_CKKS_DECIMALS                   = int(os.environ.get("RORY_COMMON_CKKS_DECIMALS","2"))
+RORY_COMMON_CKKS_SECURITY_LEVEL             = int(os.environ.get("RORY_COMMON_CKKS_SECURITY_LEVEL","128"))
+
+
 
 @pytest.fixture
 def max_workers():
@@ -85,9 +89,10 @@ async def client():
 def ckks():
     if not os.path.exists(RORY_KEYS_PATH):
         os.makedirs(RORY_KEYS_PATH,exist_ok=True)
+
     _ = Ckks.create_client(
         scheme             = "CKKS",
-        decimals           = 2,
+        decimals           = RORY_COMMON_CKKS_DECIMALS,
         security_level     = RORY_COMMON_SECURITY_LEVEL,
         save               = True,
         output_path        = RORY_KEYS_PATH,
@@ -98,7 +103,7 @@ def ckks():
 
     ckks = Ckks.from_pyfhel(
         _round   = True,
-        decimals = 2,
+        decimals = RORY_COMMON_CKKS_DECIMALS,
         path     = RORY_KEYS_PATH,
     ) 
     return ckks
@@ -106,7 +111,7 @@ def ckks():
 def dataowner_pqc(ckks):
     dataowner_pqc = DataOwnerPQC(
         scheme        = ckks,
-        securitylevel = 128
+        securitylevel = RORY_COMMON_CKKS_SECURITY_LEVEL
     )
     return dataowner_pqc
 
@@ -115,7 +120,7 @@ def dataowner():
     dataowner = DataOwner(
         liu_scheme= Liu(
             _round         = True,
-            decimals       = 2,
+            decimals       = RORY_COMMON_CKKS_DECIMALS,
             secure_random  = False,
             seed           = 1,
             use_np_random  = True,
@@ -133,15 +138,16 @@ def ckks_params():
         secretkey_filename = RORY_COMMON_SECRETKEY_FILENAME,
         relinkey_filename  = RORY_COMMON_RELINKEY_FILENAME,
         rotatekey_filename = RORY_COMMON_ROTATEKEY_FILENAME,
-        decimals           = 2,
+        decimals           = RORY_COMMON_CKKS_DECIMALS,
         _round             = True,
+
     )
 
 @pytest.fixture
 def liu_params():
     return LiuParams(
         _round         = True,
-        decimals       = 2,
+        decimals       = RORY_COMMON_CKKS_DECIMALS,
         secure_random  = False,
         seed           = 1,
         use_np_random  = True,
@@ -155,7 +161,7 @@ def fdhope_params():
         scheme         = "DBSKMEANS",
         sens           = 0.2,
         _round         = True,
-        decimals       = 2,
+        decimals       = RORY_COMMON_CKKS_DECIMALS,
         secure_random  = False,
         seed           = 1,
         use_np_random  = True,
