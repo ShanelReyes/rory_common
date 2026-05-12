@@ -163,19 +163,19 @@ Run `scripts/keygen.py` once per key set you need.
 | Argument | Default | Description |
 |---|---|---|
 | `--output-path` | *(required)* | Directory to write key files into |
-| `--mode` | `default` | CKKS parameter preset (`default`, `lite_ml`, …) |
+| `--mode` | `default` | CKKS parameter preset (`default`, `ml`, …) |
 | `--security-level` | `128` | Security level in bits — `128`, `192`, or `256` |
 | `--decimals` | `5` | Decimal precision preserved after encryption |
 | `--round` | off | Enable rounding |
 | `--enable-relinearize` | off | Generate relinearization keys |
 | `--enable-rotate` | off | Generate rotation keys |
 
-**Example — `lite_ml` keys:**
+**Example — `ml` keys:**
 
 ```bash
 python scripts/keygen.py \
-  --output-path /rory/keys/lite_ml \
-  --mode lite_ml \
+  --output-path /rory/keys/ml \
+  --mode ml \
   --security-level 128 \
   --decimals 2 \
   --round \

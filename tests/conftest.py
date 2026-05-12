@@ -41,7 +41,7 @@ MICTLANX_URI                                = os.environ.get("MICTLANX_URI",f"mi
 MICTLANX_DEBUG                              = bool(int(os.environ.get("MICTLANX_DEBUG",0)))
 RORY_COMMON_RECORDS                         = int(os.environ.get("RORY_COMMON_RECORDS","10"))
 RORY_COMMON_ATTRIBUTES                      = int(os.environ.get("RORY_COMMON_ATTRIBUTES","10"))
-RORY_CKKS_MODE                              = CkksModes(os.environ.get("RORY_CKKS_MODE","lite_ml"))
+RORY_CKKS_MODE                              = CkksModes(os.environ.get("RORY_CKKS_MODE","ml"))
 RORY_COMMON_CKKS_DECIMALS                   = int(os.environ.get("RORY_COMMON_CKKS_DECIMALS","2"))
 RORY_COMMON_CKKS_SECURITY_LEVEL             = int(os.environ.get("RORY_COMMON_CKKS_SECURITY_LEVEL","128"))
 
