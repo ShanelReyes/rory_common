@@ -556,3 +556,101 @@ async def test_put_string_path_delete_flag(client, ckks, ckks_params, storage_id
     assert first.is_ok, first.unwrap_err()
     result = await backend.put(**storage_ids, data=path, delete=True)
     assert result.is_ok, result.unwrap_err()
+
+
+@pytest.mark.asyncio
+async def test_put_a_list_with_one_element_ckks(client, ckks, ckks_params, storage_ids):
+    backend = StorageBuilder(storage_client=client, scheme=Scheme.CKKS, ckks=ckks, ckks_params=ckks_params)\
+    .with_storage_params(params=StorageParams(num_chunks=2))\
+    .build()
+    # ckks_builder(client, ckks, ckks_params)
+    data = np.array([1])
+    result = await backend.put(**storage_ids, data=data, delete=True, segment=True, encrypt=True)
+    assert result.is_ok, result.unwrap_err()
+    get_result = await backend.get(**storage_ids, segment=True, encrypt=True)
+    assert get_result.is_ok, get_result.unwrap_err()
+    value = get_result.unwrap()
+    # print(value.raw_value)
+    result2 = await backend.put(**storage_ids, data=value.raw_value, delete=True, segment=True, encrypt=False)
+    assert result2.is_ok, result2.unwrap_err()
+
+
+# ---------------------------------------------------------------------------
+# List[int] / List[float] auto-conversion
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_put_list_int_plaintext(client, liu_params, storage_ids):
+    """List[int] is accepted and stored as a float64 plaintext blob."""
+    backend = StorageBuilder(storage_client=client, scheme=Scheme.LIU, liu_params=liu_params).build()
+    data = [1, 2, 3, 4, 5]
+    result = await backend.put(**storage_ids, data=data)
+    assert result.is_ok, result.unwrap_err()
+    assert result.unwrap().dtype == np.float64
+
+
+@pytest.mark.asyncio
+async def test_put_list_float_plaintext(client, liu_params, storage_ids):
+    """List[float] is accepted and stored as a float64 plaintext blob."""
+    backend = StorageBuilder(storage_client=client, scheme=Scheme.LIU, liu_params=liu_params).build()
+    data = [0.1, 0.2, 0.3, 0.4]
+    result = await backend.put(**storage_ids, data=data)
+    assert result.is_ok, result.unwrap_err()
+    assert result.unwrap().dtype == np.float64
+
+
+@pytest.mark.asyncio
+async def test_put_list_mixed_int_float_plaintext(client, liu_params, storage_ids):
+    """A mixed List[int | float] is cast to float64."""
+    backend = StorageBuilder(storage_client=client, scheme=Scheme.LIU, liu_params=liu_params).build()
+    data = [1, 2.5, 3, 4.0]
+    result = await backend.put(**storage_ids, data=data)
+    assert result.is_ok, result.unwrap_err()
+    assert result.unwrap().dtype == np.float64
+
+
+@pytest.mark.asyncio
+async def test_put_list_empty_returns_err(client, liu_params, storage_ids):
+    """An empty list returns Err, not an exception."""
+    backend = StorageBuilder(storage_client=client, scheme=Scheme.LIU, liu_params=liu_params).build()
+    result = await backend.put(**storage_ids, data=[])
+    assert result.is_err
+
+
+@pytest.mark.asyncio
+async def test_put_get_list_float_round_trip(client, liu_params, storage_ids):
+    """Round-trip: List[float] put then get returns the same values."""
+    backend = StorageBuilder(storage_client=client, scheme=Scheme.LIU, liu_params=liu_params).build()
+    data = [1.0, 2.0, 3.0, 4.0, 5.0]
+    result = await backend.put(**storage_ids, data=data)
+    assert result.is_ok, result.unwrap_err()
+    get_result = await backend.get(**storage_ids)
+    assert get_result.is_ok, get_result.unwrap_err()
+    retrieved = get_result.unwrap().raw_value
+    np.testing.assert_array_almost_equal(retrieved.flatten(), np.array(data, dtype=np.float64))
+
+
+@pytest.mark.asyncio
+async def test_put_list_int_segment(client, liu_params, storage_ids):
+    """List[int] with segment=True splits into plaintext chunks correctly."""
+    backend = StorageBuilder(
+        storage_client = client,
+        scheme         = Scheme.LIU,
+        liu_params     = liu_params,
+    ).with_storage_params(StorageParams(num_chunks=2)).build()
+    data = [10, 20, 30, 40, 50, 60, 70, 80]
+    result = await backend.put(**storage_ids, data=data, segment=True)
+    assert result.is_ok, result.unwrap_err()
+    assert result.unwrap().dtype == np.float64
+
+
+@pytest.mark.asyncio
+async def test_put_list_int_encrypt_ckks(client, ckks, ckks_params, storage_ids):
+    """List[int] with encrypt=True on a CKKS backend uses the vector CKKS path."""
+    backend = ckks_builder(client, ckks, ckks_params)
+    data = [1, 2, 3, 4]
+    result = await backend.put(**storage_ids, data=data, encrypt=True)
+    assert result.is_ok, result.unwrap_err()
+    get_result = await backend.get(**storage_ids, encrypt=True)
+    assert get_result.is_ok, get_result.unwrap_err()
+    assert len(get_result.unwrap().raw_value) > 0
