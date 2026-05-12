@@ -181,7 +181,7 @@ class StorageBuilder:
     def __init__(
         self,
         storage_client: AsyncClient,
-        scheme: Scheme,
+        scheme: Optional[Scheme]= None,
         ckks: Optional[Ckks] = None,
         ckks_params: Optional[CkksParams] = None,
         liu_params: Optional[LiuParams] = None,
@@ -322,7 +322,7 @@ class StorageBackend:
     def __init__(
         self,
         client: AsyncClient,
-        scheme: Scheme,
+        scheme: Optional[Scheme]= None,
         ckks: Optional[Ckks] = None,
         ckks_params: Optional[CkksParams] = None,
         liu_params: Optional[LiuParams] = None,
@@ -371,7 +371,7 @@ class StorageBackend:
         self,
         bucket_id: str,
         ball_id: str,
-        data: Union[npt.NDArray, List[PyCtxt], Chunks, str],
+        data: Union[npt.NDArray, List[PyCtxt], List[int], List[float], Chunks, str],
         tags: Dict[str, str] = {},
         segment: bool = False,
         encrypt: bool = False,
@@ -385,6 +385,7 @@ class StorageBackend:
         | ``data type`` | ``encrypt`` | ``segment`` | ``data.ndim`` | scheme | action |
         |---|---|---|---|---|---|
         | ``str`` (file path) | any | any | — | any | delegates to ``put_from_file`` |
+        | ``List[int]`` / ``List[float]`` | any | any | — | any | auto-converted to 1-D ``float64`` ndarray, then follows the ndarray rows below |
         | ``List[PyCtxt]`` | ``False`` | — | — | CKKS | serialize ciphertexts → ``put_chunks`` |
         | ``Chunks`` | ``False`` | — | — | any | ``put_chunks`` directly |
         | ``ndarray`` | ``True`` | — | 1 | CKKS | vector initialized-executor CKKS pipeline |
@@ -397,8 +398,9 @@ class StorageBackend:
         Args:
             bucket_id: Target bucket name.
             ball_id: Key identifying the object within the bucket.
-            data: Data to store — a numpy array, a pre-encrypted ``List[PyCtxt]``,
-                a pre-built ``Chunks`` object, or a **file path string**.
+            data: Data to store — a numpy array, a ``List[int]`` or ``List[float]``
+                (auto-converted to a 1-D ``float64`` ndarray), a pre-encrypted
+                ``List[PyCtxt]``, a pre-built ``Chunks`` object, or a **file path string**.
                 When a string is passed the extension is derived from the path suffix
                 and the call is forwarded to ``put_from_file``.
             tags: Arbitrary key/value metadata stored alongside the object.
@@ -435,8 +437,15 @@ class StorageBackend:
                     encrypt   = encrypt,
                     delete    = False,
                 )
+            # List[int] / List[float] — convert to 1-D float64 ndarray before dispatch.
+            if isinstance(data, list) and all(isinstance(x, (int, float)) for x in data):
+                if len(data) == 0:
+                    return Err(ValueError("data list is empty."))
+                data = np.array(data, dtype=np.float64)
             t0 = T.monotonic()
             _scheme = scheme or self.scheme
+            if encrypt and _scheme is None:
+                return Err(ValueError("scheme is required when encrypt=True"))
             # Pre-processed List[PyCtxt] — from_pyctxts_to_chunks → put_chunks
             if isinstance(data, list) and _scheme == Scheme.CKKS and not encrypt:
                 if not all(isinstance(x, PyCtxt) for x in data):
@@ -1749,9 +1758,26 @@ class Common:
         """
         try:
             n = len(xs)
+            if n==0:
+                raise ValueError("Input list of PyCtxt is empty.")
+            if n == 1:
+                chunk = Chunk.from_list(
+                    group_id = key,
+                    index    = 0,
+                    chunk_id = Some(f"{key}_0"),
+                    metadata = {
+                        "num_chunks": "1",
+                        "shape"     : str((1,)),
+                    },
+                    xs       = [xs[0].to_bytes()],
+                )
+                return Some(Chunks(chs=[chunk], n=1, strict=False))
+            
+            if num_chunks > n:
+                num_chunks = n
             chs = Chunks._iter_to_chunks(num_chunks=num_chunks,chunk_prefix=Some(key),group_id=key,n=n,iterable=xs)
             def __inner():
-                for c in chs: 
+                for c in chs:
                     chunk_id = Some(c.get("chunk_id",None)).filter(lambda x: not x == None)
                     data = [x.to_bytes() for x in c["data"]]
                     c_tmp = Chunk.from_list(
@@ -1762,10 +1788,10 @@ class Common:
                         xs       = data,
                     )
                     yield c_tmp
-            return Some(Chunks(chs= __inner() , n = n ))
+            return Some(Chunks(chs= __inner(), n=n, strict=False))
         except Exception as e:
-            print(e)
-            return e
+            from option import NONE
+            return NONE
     
 
     @staticmethod

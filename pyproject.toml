@@ -1,6 +1,6 @@
 [project]
 name = "rorycommon"
-version = "1.0.0-alpha.1"
+version = "1.0.0-alpha.2"
 description = ""
 authors = [
     {name = "Ignacio Castillo",email = "ignacio.bcastillo@gmail.com"},
@@ -18,7 +18,7 @@ mictlanx = {version = "0.1.0a6", source = "testpypi"}
 phe = "^1.5.0"
 pyfhel = "3.5.0"
 python-dotenv = "^1.2.2"
-rory = "0.1.6"
+rory = "0.1.7"
 
 [tool.poetry]
 packages = [{include = "rorycommon", from = "src"}]
