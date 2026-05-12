@@ -88,6 +88,7 @@ the matching `get()` call that you used in `put()`.
 | `data` type | `encrypt` | `segment` | `data.ndim` | scheme | What happens |
 |---|---|---|---|---|---|
 | `str` (file path) | any | any | - | any | Extension derived from the path suffix; delegates to `put_from_file` |
+| `List[int]` / `List[float]` | any | any | - | any | Auto-converted to a 1-D `float64` ndarray, then follows the ndarray rows below |
 | `ndarray` | `False` | `False` | any | any | Single plaintext blob |
 | `ndarray` | `False` | `True` | any | any | Split into `num_chunks` plaintext chunks |
 | `ndarray` | `True` | - | 1 | CKKS | Encrypt the whole vector as one ciphertext chunk |
