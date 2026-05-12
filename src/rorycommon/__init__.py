@@ -181,7 +181,7 @@ class StorageBuilder:
     def __init__(
         self,
         storage_client: AsyncClient,
-        scheme: Scheme,
+        scheme: Optional[Scheme]= None,
         ckks: Optional[Ckks] = None,
         ckks_params: Optional[CkksParams] = None,
         liu_params: Optional[LiuParams] = None,
@@ -322,7 +322,7 @@ class StorageBackend:
     def __init__(
         self,
         client: AsyncClient,
-        scheme: Scheme,
+        scheme: Optional[Scheme]= None,
         ckks: Optional[Ckks] = None,
         ckks_params: Optional[CkksParams] = None,
         liu_params: Optional[LiuParams] = None,
@@ -444,6 +444,8 @@ class StorageBackend:
                 data = np.array(data, dtype=np.float64)
             t0 = T.monotonic()
             _scheme = scheme or self.scheme
+            if encrypt and _scheme is None:
+                return Err(ValueError("scheme is required when encrypt=True"))
             # Pre-processed List[PyCtxt] — from_pyctxts_to_chunks → put_chunks
             if isinstance(data, list) and _scheme == Scheme.CKKS and not encrypt:
                 if not all(isinstance(x, PyCtxt) for x in data):

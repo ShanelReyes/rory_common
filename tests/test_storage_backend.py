@@ -654,3 +654,67 @@ async def test_put_list_int_encrypt_ckks(client, ckks, ckks_params, storage_ids)
     get_result = await backend.get(**storage_ids, encrypt=True)
     assert get_result.is_ok, get_result.unwrap_err()
     assert len(get_result.unwrap().raw_value) > 0
+
+
+# ---------------------------------------------------------------------------
+# scheme=None (plaintext-only backend) — unit tests (no network)
+# ---------------------------------------------------------------------------
+
+def test_builder_no_scheme(client):
+    """StorageBuilder with no scheme builds successfully; backend.scheme is None."""
+    backend = StorageBuilder(storage_client=client).build()
+    assert backend.scheme is None
+
+
+def test_builder_no_scheme_round_trip(client):
+    """as_builder() preserves scheme=None through a round-trip."""
+    backend = StorageBuilder(storage_client=client).build()
+    cloned = backend.as_builder().build()
+    assert cloned.scheme is None
+
+
+# ---------------------------------------------------------------------------
+# scheme=None — integration tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_put_encrypt_no_scheme_returns_err(client, small_matrix, storage_ids):
+    """encrypt=True with scheme=None returns Err instead of silently storing plaintext."""
+    backend = StorageBuilder(storage_client=client).build()
+    result = await backend.put(**storage_ids, data=small_matrix, encrypt=True)
+    assert result.is_err
+    assert "scheme" in str(result.unwrap_err()).lower()
+
+
+@pytest.mark.asyncio
+async def test_put_no_scheme_plaintext(client, small_matrix, storage_ids):
+    """scheme=None stores a plaintext ndarray without errors."""
+    backend = StorageBuilder(storage_client=client).build()
+    result = await backend.put(**storage_ids, data=small_matrix)
+    assert result.is_ok, result.unwrap_err()
+    assert result.unwrap().shape == small_matrix.shape
+
+
+@pytest.mark.asyncio
+async def test_put_get_no_scheme_plaintext(client, small_matrix, storage_ids):
+    """scheme=None round-trip: put then get returns the original matrix."""
+    backend = StorageBuilder(storage_client=client).build()
+    await backend.put(**storage_ids, data=small_matrix)
+    get_result = await backend.get(**storage_ids)
+    assert get_result.is_ok, get_result.unwrap_err()
+    np.testing.assert_array_almost_equal(get_result.unwrap().raw_value, small_matrix)
+
+
+@pytest.mark.asyncio
+async def test_put_get_no_scheme_segment(client, small_matrix, storage_ids):
+    """scheme=None with segment=True stores and retrieves chunked plaintext."""
+    backend = (
+        StorageBuilder(storage_client=client)
+        .with_storage_params(StorageParams(num_chunks=2))
+        .build()
+    )
+    result = await backend.put(**storage_ids, data=small_matrix, segment=True)
+    assert result.is_ok, result.unwrap_err()
+    get_result = await backend.get(**storage_ids, segment=True)
+    assert get_result.is_ok, get_result.unwrap_err()
+    assert isinstance(get_result.unwrap().raw_value, np.ndarray)
