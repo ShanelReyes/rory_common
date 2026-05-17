@@ -1,7 +1,6 @@
 import time as T
 import asyncio
 import warnings
-from mictlanx import AsyncClient
 from rorycommon.utils import Utils as RoryCommonUtils
 import mictlanx.interfaces as InterfaceX
 from option import Option,Result,Ok,Err,Some
@@ -10,7 +9,6 @@ import numpy.typing as npt
 import pandas as pd
 import os
 from typing import Self, Tuple, Generator, Dict, AsyncGenerator, Optional, Union, List, Awaitable,Any
-from mictlanx.utils.segmentation import Chunks,Chunk
 from rory.core.security.dataowner import DataOwner
 from rory.core.security.dataowner_paillier import DataOwner as DataOwnerPHE
 from rory.core.security.cryptosystem.liu import Liu
@@ -21,17 +19,55 @@ from Pyfhel import PyCtxt
 import pickle
 from rory.core.security.cryptosystem.pqc.ckks import Ckks
 import hashlib as H
-from mictlanx.logger.log import Log
 from rorycommon.models import PutPlaintextResult, PutCiphertextResult,GetResult,TList,SourceType
 
+from mictlanx.logger.log import Log
+from dotenv import load_dotenv
 
-DEBUG = bool(int(os.environ.get("RORY_COMMON_DEBUG","1")))
-RORY_COMMON_LOG_PATH = os.environ.get("RORY_COMMON_LOG_PATH","/mictlanx/client")
+RORY_COMMON_ENV_FILE_PATH = os.environ.get("RORY_COMMON_ENV_FILE_PATH","./.env")
+print(f"Loading environment variables from: {RORY_COMMON_ENV_FILE_PATH}")
+if os.path.exists(RORY_COMMON_ENV_FILE_PATH):
+    load_dotenv(dotenv_path=RORY_COMMON_ENV_FILE_PATH)
+
+
+
+
+
+# DEBUG                                 = bool(int(os.environ.get("RORY_COMMON_DEBUG","1")))
+RORY_COMMON_LOG_PATH                  = os.environ.get("RORY_COMMON_LOG_PATH","./.rory/log")
+RORY_COMMON_LOG_CONSOLE_HANDLER_LEVEL = os.environ.get("RORY_COMMON_LOG_CONSOLE_HANDLER_LEVEL","INFO")
+RORY_COMMON_LOG_DISABLED              = bool(int(os.environ.get("RORY_COMMON_LOG_DISABLED","1")))
+RORY_COMMON_LOG_ERROR_TO_FILE             = bool(int(os.environ.get("RORY_COMMON_LOG_ERROR_TO_FILE", "0")))
+RORY_COMMON_LOG_INTERVAL              = int(os.environ.get("RORY_COMMON_LOG_INTERVAL", "60"))
+RORY_COMMON_LOG_FILE_HANDLER_LEVEL    = os.environ.get("RORY_COMMON_LOG_FILE_HANDLER_LEVEL", "DEBUG")
+# RORY_COMMON_LOG_OUTPUT_PATH           = os.environ.get("RORY_COMMON_LOG_OUTPUT_PATH", RORY_COMMON_LOG_PATH)
+RORY_COMMON_LOG_TO_FILE               = bool(int(os.environ.get("RORY_COMMON_LOG_TO_FILE", "0")))
+RORY_COMMON_LOG_WHEN                  = os.environ.get("RORY_COMMON_LOG_WHEN", "m")
+RORY_COMMON_LOG_JSON_INDENT           = os.environ.get("RORY_COMMON_LOG_JSON_INDENT", "0")
+RORY_COMMON_LOG_RICH                = bool(int(os.environ.get("RORY_COMMON_LOG_RICH", "0")))
+RORY_COMMON_LOG_MICTLANX_PROPAGATE  = bool(int(os.environ.get("RORY_COMMON_LOG_MICTLANX_PROPAGATE", "1")))
+if RORY_COMMON_LOG_MICTLANX_PROPAGATE:
+    os.environ.setdefault("MICTLANX_LOG_DISABLED", str(int(RORY_COMMON_LOG_DISABLED)))
+    os.environ.setdefault("MICTLANX_LOG_LEVEL", RORY_COMMON_LOG_CONSOLE_HANDLER_LEVEL)
+    os.environ.setdefault("MICTLANX_LOG_RICH", str(int(RORY_COMMON_LOG_RICH)))
+    os.environ.setdefault("MICTLANX_LOG_TO_FILE", str(int(RORY_COMMON_LOG_TO_FILE)))
+    os.environ.setdefault("MICTLANX_LOG_ERROR_FILE", str(int(RORY_COMMON_LOG_ERROR_TO_FILE)))
+    os.environ.setdefault("MICTLANX_LOG_ROTATION_WHEN", RORY_COMMON_LOG_WHEN)
+    os.environ.setdefault("MICTLANX_LOG_ROTATION_INTERVAL", str(RORY_COMMON_LOG_INTERVAL))
+
+from mictlanx import AsyncClient
+from mictlanx.utils.segmentation import Chunks,Chunk
+
 L = Log(
-    name                   = __name__,
-    console_handler_filter = lambda r : DEBUG,
-    to_file                = False,
-    path                   = RORY_COMMON_LOG_PATH
+    name                  = __name__,
+    console_handler_level = RORY_COMMON_LOG_CONSOLE_HANDLER_LEVEL,
+    disabled              = RORY_COMMON_LOG_DISABLED,
+    error_log             = RORY_COMMON_LOG_ERROR_TO_FILE,
+    interval              = RORY_COMMON_LOG_INTERVAL,
+    file_handler_level    = RORY_COMMON_LOG_FILE_HANDLER_LEVEL,
+    path                  = RORY_COMMON_LOG_PATH,
+    to_file               = RORY_COMMON_LOG_TO_FILE,
+    when                  = RORY_COMMON_LOG_WHEN
 )
 
 from enum import Enum
