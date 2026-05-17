@@ -183,6 +183,71 @@ python scripts/keygen.py \
   --enable-rotate
 ```
 
+## Configuration
+
+Copy `.env.test` to `.env` and fill in the values for your environment before running any code or tests.
+
+### Mictlanx client
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `MICTLANX_URI` | `mictlanx://mictlanx-router-0@localhost:63666?api_version=4&protocol=http` | Storage node URI |
+| `MICTLANX_CLIENT_ID` | `rory-common_mictlanx` | Client identifier sent to the router |
+| `MICTLANX_BUCKET_ID` | `rory` | Default bucket name |
+| `MICTLANX_TIMEOUT` | `3600` | Request timeout in seconds |
+| `MICTLANX_API_VERSION` | `4` | Mictlanx API version |
+| `MICTLANX_MAX_WORKERS` | `12` | Worker threads inside `AsyncClient` |
+| `MICTLANX_OUTPUT_PATH` | `/rory/mictlanx` | Local output directory for mictlanx |
+| `MICTLANX_PROTOCOL` | `http` | Transport protocol (`http` or `https`) |
+| `MICTLANX_DEBUG` | `0` | Enable mictlanx debug output (`0`/`1`) |
+
+### CKKS / key files
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `RORY_KEYS_PATH` | `/rory/keys/test2` | Directory containing CKKS key files |
+| `RORY_COMMON_CTX_FILENAME` | `ctx` | CKKS context file name |
+| `RORY_COMMON_PUBKEY_FILENAME` | `pubkey` | CKKS public key file name |
+| `RORY_COMMON_SECRETKEY_FILENAME` | `secretkey` | CKKS secret key file name |
+| `RORY_COMMON_RELINKEY_FILENAME` | `relinkey` | CKKS relinearization key file name |
+| `RORY_COMMON_ROTATEKEY_FILENAME` | `rotatekey` | CKKS rotation key file name |
+| `RORY_COMMON_SECURITY_LEVEL` | `128` | CKKS security level in bits |
+| `RORY_COMMON_CKKS_DECIMALS` | `2` | Decimal precision for CKKS (used by test fixtures) |
+| `RORY_COMMON_CKKS_SECURITY_LEVEL` | `128` | Security level for CKKS (used by test fixtures) |
+| `RORY_CKKS_MODE` | `ml` | CKKS parameter preset (`default`, `ml`, …) |
+| `RORY_ENABLE_ROTATE_KEY_GENERATION` | `1` | Generate rotation keys during test setup (`0`/`1`) |
+| `RORY_ENABLE_REALINEARIZATION_KEY_GENERATION` | `1` | Generate relinearization keys during test setup (`0`/`1`) |
+
+### Process pool / workers
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `RORY_MAX_WORKERS` | `2` | `ProcessPoolExecutor` size for encryption tasks |
+| `RORY_SOURCE_PATH` | `/rory/source` | Root path for source data files |
+| `RORY_COMMON_ENV_FILE_PATH` | `./.env` | `.env` file loaded automatically at import time |
+
+### Logging
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `RORY_COMMON_LOG_DISABLED` | `1` | Disable rory-common logging entirely (`0`/`1`) |
+| `RORY_COMMON_LOG_PATH` | `./.rory/log` | Log file directory |
+| `RORY_COMMON_LOG_CONSOLE_HANDLER_LEVEL` | `INFO` | Console log level (`DEBUG`, `INFO`, `WARNING`, …) |
+| `RORY_COMMON_LOG_FILE_HANDLER_LEVEL` | `DEBUG` | File log level |
+| `RORY_COMMON_LOG_TO_FILE` | `0` | Write logs to a rotating file (`0`/`1`) |
+| `RORY_COMMON_LOG_ERROR_TO_FILE` | `0` | Write error logs to a separate file (`0`/`1`) |
+| `RORY_COMMON_LOG_INTERVAL` | `60` | Log rotation interval, in units of `RORY_COMMON_LOG_WHEN` |
+| `RORY_COMMON_LOG_WHEN` | `m` | Rotation time unit (`s` seconds, `m` minutes, `h` hours, `d` days) |
+| `RORY_COMMON_LOG_RICH` | `0` | Use Rich console formatter (`0`/`1`) |
+| `RORY_COMMON_LOG_JSON_INDENT` | `0` | JSON log indentation (`0` = minified) |
+| `RORY_COMMON_LOG_MICTLANX_PROPAGATE` | `1` | Mirror rory-common log settings into mictlanx (`0`/`1`) |
+
+!!! note "Mictlanx log propagation"
+    When `RORY_COMMON_LOG_MICTLANX_PROPAGATE=1`, rory-common automatically sets the following
+    mictlanx variables via `os.environ.setdefault` (they can still be overridden individually in your `.env`):
+    `MICTLANX_LOG_DISABLED`, `MICTLANX_LOG_LEVEL`, `MICTLANX_LOG_RICH`, `MICTLANX_LOG_TO_FILE`,
+    `MICTLANX_LOG_ERROR_FILE`, `MICTLANX_LOG_ROTATION_WHEN`, `MICTLANX_LOG_ROTATION_INTERVAL`.
+
 ## Running tests
 
 Integration tests require a running mictlanx instance and pre-generated CKKS keys.

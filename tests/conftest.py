@@ -2,8 +2,6 @@ import os
 # from httpx import AsyncClient
 import pytest
 import numpy as np
-from mictlanx import AsyncClient
-from rorycommon import Common as RoryCommon, CkksParams, LiuParams, FdhopeParams
 from concurrent.futures import ProcessPoolExecutor
 from rory.core.security.dataowner import DataOwner
 from rory.core.security.pqc.dataowner import DataOwner as DataOwnerPQC
@@ -16,6 +14,8 @@ RORY_COMMON_ENV_FILE_PATH = os.environ.get("RORY_COMMON_ENV_FILE_PATH","./.env.t
 if os.path.exists(RORY_COMMON_ENV_FILE_PATH):
     load_dotenv(dotenv_path=RORY_COMMON_ENV_FILE_PATH)
 
+from mictlanx import AsyncClient
+from rorycommon import Common as RoryCommon, CkksParams, LiuParams, FdhopeParams
 
 
 
@@ -32,13 +32,15 @@ RORY_ENABLE_REALINEARIZATION_KEY_GENERATION = bool(int(os.environ.get("RORY_ENAB
 RORY_SOURCE_PATH                            = os.environ.get("RORY_SOURCE_PATH", "/rory/source")
 MICTLANX_CLIENT_ID                          = os.environ.get("MICTLANX_CLIENT_ID","{}_mictlanx".format("rory-common"))
 MICTLANX_TIMEOUT                            = int(os.environ.get("MICTLANX_TIMEOUT",3600))
-MICTLANX_API_VERSION                        = int(os.environ.get("MICTLANX_API_VERSION","4"))
+x = os.environ.get("MICTLANX_API_VERSION","4")
+MICTLANX_API_VERSION                        = int(x)
 MICTLANX_MAX_WORKERS                        = int(os.environ.get("MICTLANX_MAX_WORKERS","12"))
 MICTLANX_BUCKET_ID                          = os.environ.get("MICTLANX_BUCKET_ID","rory")
 MICTLANX_OUTPUT_PATH                        = os.environ.get("MICTLANX_OUTPUT_PATH","/rory/mictlanx")
 MICTLANX_PROTOCOL                           = os.environ.get("MICTLANX_PROTOCOL","http")
 MICTLANX_URI                                = os.environ.get("MICTLANX_URI",f"mictlanx://mictlanx-router-0@localhost:63666?api_version={MICTLANX_API_VERSION}&protocol={MICTLANX_PROTOCOL}")
 MICTLANX_DEBUG                              = bool(int(os.environ.get("MICTLANX_DEBUG",0)))
+MICTLANX_LOG_DISABLED                     = bool(int(os.environ.get("MICTLANX_LOG_DISABLED",1)))
 RORY_COMMON_RECORDS                         = int(os.environ.get("RORY_COMMON_RECORDS","10"))
 RORY_COMMON_ATTRIBUTES                      = int(os.environ.get("RORY_COMMON_ATTRIBUTES","10"))
 RORY_CKKS_MODE                              = CkksModes(os.environ.get("RORY_CKKS_MODE","ml"))
@@ -72,13 +74,13 @@ def get_context():
 
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 async def client():
     client = AsyncClient(
         uri              = MICTLANX_URI,
         client_id        = MICTLANX_CLIENT_ID,
         capacity_storage = "200mb",
-        debug            = MICTLANX_DEBUG,
+        enable_logging   = not MICTLANX_LOG_DISABLED,
         eviction_policy  = "LRU",
         max_workers      = MICTLANX_MAX_WORKERS,
         verify           = False
