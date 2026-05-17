@@ -2,7 +2,6 @@ import pytest
 import numpy as np
 from uuid import uuid4
 from rorycommon import Common as RoryCommon
-# from result import Ok, Err 
 
 # -----------------------------------------------------------------------------
 # 1. Real Fixtures

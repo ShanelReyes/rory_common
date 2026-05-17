@@ -6,41 +6,14 @@ from concurrent.futures import ProcessPoolExecutor
 import time as T
 from phe import generate_paillier_keypair,EncryptedNumber
 import os
-from mictlanx import AsyncClient 
 
 
-MICTLANX_CLIENT_ID           = os.environ.get("MICTLANX_CLIENT_ID","{}_mictlanx".format("rory-common"))
-MICTLANX_TIMEOUT             = int(os.environ.get("MICTLANX_TIMEOUT",3600))
-MICTLANX_API_VERSION         = int(os.environ.get("MICTLANX_API_VERSION","3"))
-MICTLANX_ROUTERS             = os.environ.get("MICTLANX_ROUTERS", "mictlanx-router-0:localhost:60666") #mictlanx-peer-2:localhost:7002")
-MICTLANX_DEBUG               = bool(int(os.environ.get("MICTLANX_DEBUG",0)))
-MICTLANX_DAEMON              = bool(int(os.environ.get("MICTLANX_DAEMON",1)))
-MICTLANX_SHOW_METRICS        = bool(int(os.environ.get("MICTLANX_SHOW_METRICS",0)))
-MICTLANX_DISABLED_LOG        = bool(int(os.environ.get("MICTLANX_DISABLED_LOG",0)))
-MICTLANX_MAX_WORKERS         = int(os.environ.get("MICTLANX_MAX_WORKERS","12"))
-MICTLANX_CLIENT_LB_ALGORITHM = os.environ.get("MICTLANX_CLIENT_LB_ALGORITHM","2CHOICES_UF")
-MICTLANX_BUCKET_ID           = os.environ.get("MICTLANX_BUCKET_ID","rory") 
-MICTLANX_OUTPUT_PATH         = os.environ.get("MICTLANX_OUTPUT_PATH","/rory/mictlanx")
-MICTLANX_PROTOCOL            = os.environ.get("MICTLANX_PROTOCOL","http")
-MICTLANX_URI = os.environ.get("MICTLANX_URI",f"mictlanx://mictlanx-router-0@localhost:63666?api_version={MICTLANX_API_VERSION}&protocol={MICTLANX_PROTOCOL}")
-MICTLANX_DEBUG  = bool(int(os.environ.get("MICTLANX_DEBUG",0)))
 
-
-client = AsyncClient(
-    uri              = MICTLANX_URI,
-    client_id        = MICTLANX_CLIENT_ID,
-    capacity_storage = "200mb",
-    debug            = MICTLANX_DEBUG,
-    eviction_policy  = "LRU",
-    max_workers      = MICTLANX_MAX_WORKERS,
-    # routers          = list(Utils.routers_from_str(routers_str=MICTLANX_ROUTERS,protocol="http")),
-    verify           = False
-)
 
 
 @pytest.mark.skip(reason="This test is for development purposes only and should not be run in CI.")
 @pytest.mark.asyncio
-async def test_put_chunk():
+async def test_put_chunk(client):
     ball_id = "x"
     do = DataOwner(securitylevel=128)
     do.generate_keys()
@@ -72,7 +45,7 @@ async def test_put_chunk():
 
 @pytest.mark.skip("")
 @pytest.mark.asyncio
-async def test_get_chunk():
+async def test_get_chunk(client):
     ball_id = "phex"
     res = await RoryCommon.get_paillier_chunk_or_error(client=client, bucket_id="rory",ball_id=ball_id,index=1)
     print(res)
@@ -80,13 +53,13 @@ async def test_get_chunk():
 
 @pytest.mark.skip("")
 @pytest.mark.asyncio
-async def test_get():
+async def test_get(client):
     ball_id = "phex"
     res = await RoryCommon.get_paillier_matrix(client=client, bucket_id="rory",ball_id=ball_id)
     print(res)
 @pytest.mark.skip("")
 @pytest.mark.asyncio
-async def test_segment_and_encrypt():
+async def test_segment_and_encrypt(client):
     do = DataOwner(securitylevel=128)
     do.generate_keys()
     t1           = T.time()
