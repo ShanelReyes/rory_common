@@ -9,3 +9,4 @@ htmlcov/
 CLAUDE.md
 .claude
 .cache
+*.log
